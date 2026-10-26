@@ -1,14 +1,16 @@
+import asyncio
 import json
 import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, UploadFile
+from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
 
-from .config import DATA_ROOT, LIMITS, SUPPORTED
+from .access import AccessPolicy
+from .config import DATA_ROOT, Settings, SUPPORTED
 from .demo import create_demo
 from .jobs import BusyError, JobManager
 from .processing import file_record
@@ -42,19 +44,40 @@ def word_available():
     return False
 
 
-def create_app(data_root: Path | None = None):
-    store = JobStore(data_root or DATA_ROOT)
+def create_app(data_root: Path | None = None, settings=None):
+    settings = settings or Settings.from_env()
+    limits = settings.limits()
+    if settings.public and data_root is None and not os.environ.get('OCR_DATA_DIR'):
+        raise ValueError('El modo público necesita OCR_DATA_DIR para separar sus documentos de la versión local.')
+    store = JobStore(data_root or DATA_ROOT, limits=limits)
     manager = JobManager(store)
+    access = AccessPolicy(store, settings)
 
     @asynccontextmanager
     async def lifespan(app):
-        yield
-        manager.close()
+        async def sweep():
+            while True:
+                await asyncio.to_thread(access.cleanup, manager)
+                await asyncio.sleep(60)
+        cleanup = asyncio.create_task(sweep()) if settings.public else None
+        try:
+            yield
+        finally:
+            if cleanup:
+                cleanup.cancel()
+                try:
+                    await cleanup
+                except asyncio.CancelledError:
+                    pass
+            manager.close()
+            access.cleanup(manager)
 
     app = FastAPI(title='Proyecto OCR', lifespan=lifespan, docs_url=None, redoc_url=None, openapi_url=None)
     app.state.store = store
     app.state.manager = manager
-    app.add_middleware(LocalOnlyMiddleware)
+    app.state.access = access
+    app.state.settings = settings
+    app.add_middleware(LocalOnlyMiddleware, settings=settings, limits=limits)
 
     @app.exception_handler(BusyError)
     async def busy_error(request, error):
@@ -70,24 +93,32 @@ def create_app(data_root: Path | None = None):
 
     @app.get('/api/health')
     def health():
-        return dict(name='Proyecto OCR', version='1.0.0', local=True, word=word_available(),
-                    limits=dict(files=LIMITS.files, file_mb=LIMITS.file_bytes // 1024**2,
-                                job_mb=LIMITS.job_bytes // 1024**2, reference_mb=LIMITS.reference_bytes // 1024**2))
+        return dict(name='Proyecto OCR', version='1.1.0', local=not settings.public, word=word_available(),
+                    retention_seconds=settings.retention_seconds if settings.public else None,
+                    limits=dict(files=limits.files, file_mb=limits.file_bytes // 1024**2,
+                                job_mb=limits.job_bytes // 1024**2, reference_mb=limits.reference_bytes // 1024**2))
+
+    @app.get('/api/session')
+    def session(request: Request, response: Response):
+        return access.session(request, response)
 
     @app.get('/api/jobs')
-    def jobs():
+    def jobs(request: Request):
+        owner = access.owner(request)
         return [dict(id=j['id'], name=j['name'], status=j['status'], created=j['created'],
-                     demo=j['demo'], count=sum(f['original'] for f in j['files'])) for j in store.list()]
+                     demo=j['demo'], count=sum(f['original'] for f in j['files']))
+                for j in store.list() if access.visible(j, owner)]
 
     @app.get('/api/jobs/{job_id}')
-    def get_job(job_id: str):
-        job = store.get(job_id)
+    def get_job(job_id: str, request: Request):
+        job = access.get(job_id, access.owner(request))
         job['cancellation_requested'] = manager.active == job_id and manager.cancelled.is_set()
-        return job
+        return access.present(job)
 
     @app.post('/api/jobs')
-    async def upload(files: list[UploadFile] = File(...), paths: str = Form('[]'),
+    async def upload(request: Request, files: list[UploadFile] = File(...), paths: str = Form('[]'),
                      options: str = Form('{}'), reference: UploadFile | None = File(None)):
+        owner = access.owner(request)
         job = None
         try:
             try:
@@ -99,8 +130,8 @@ def create_app(data_root: Path | None = None):
                 raise ValueError('Las rutas deben ser una lista de nombres.')
             if names and len(names) != len(files):
                 raise ValueError('La lista de rutas no coincide con los archivos.')
-            if not files or len(files) > LIMITS.files:
-                raise HTTPException(413, f'Selecciona entre 1 y {LIMITS.files} archivos.')
+            if not files or len(files) > limits.files:
+                raise HTTPException(413, f'Selecciona entre 1 y {limits.files} archivos.')
             if selected['classify'] and not selected['recognize']:
                 raise ValueError('Activa reconocimiento para clasificar por logotipo.')
             if selected['recognize'] and reference is None:
@@ -108,7 +139,8 @@ def create_app(data_root: Path | None = None):
             relative_paths = [safe_relative(n) for n in (names or [f.filename or '' for f in files])]
             if any(path.suffix.lower() not in SUPPORTED for path in relative_paths):
                 raise ValueError('Solo se admiten archivos PDF, DOCX y MSG.')
-            job = store.create(selected, status='uploading')
+            access.cleanup(manager)
+            job = access.create(selected, owner, status='uploading')
             directory = store.directory(job['id'])
             total = 0
             for uploaded, relative in zip(files, relative_paths):
@@ -118,7 +150,7 @@ def create_app(data_root: Path | None = None):
                     while chunk := await uploaded.read(1024 * 1024):
                         size += len(chunk)
                         total += len(chunk)
-                        if size > LIMITS.file_bytes or total > LIMITS.job_bytes:
+                        if size > limits.file_bytes or total > limits.job_bytes:
                             raise HTTPException(413, 'Los archivos superan el límite de tamaño del lote o de un archivo.')
                         destination.write(chunk)
                 if not size:
@@ -131,17 +163,18 @@ def create_app(data_root: Path | None = None):
                 extension = Path(reference.filename or '').suffix.lower()
                 if extension not in {'.png', '.jpg', '.jpeg'}:
                     raise ValueError('La referencia debe ser PNG o JPEG.')
-                data = await reference.read(LIMITS.reference_bytes + 1)
-                if len(data) > LIMITS.reference_bytes:
-                    raise HTTPException(413, 'El logotipo supera 10 MB.')
+                data = await reference.read(limits.reference_bytes + 1)
+                if len(data) > limits.reference_bytes:
+                    raise HTTPException(413, f'El logotipo supera {limits.reference_bytes // 1024**2} MB.')
                 target = directory / ('reference' + extension)
                 target.write_bytes(data)
-                load_reference(target)
+                if not settings.public:
+                    load_reference(target)
                 job['reference'] = target.name
             job['name'] = f"{len(job['files'])} documentos"
             job['status'] = 'ready'
             store.save(job)
-            return job
+            return access.present(job)
         except Exception:
             if job:
                 store.delete(job['id'])
@@ -153,34 +186,39 @@ def create_app(data_root: Path | None = None):
                 await reference.close()
 
     @app.post('/api/demo')
-    def demo():
-        job = store.create(Options(convert=False, extract=False).model_dump(), demo=True, status='preparing')
+    def demo(request: Request):
+        owner = access.owner(request)
+        access.cleanup(manager)
+        job = access.create(Options(convert=False, extract=False).model_dump(), owner, demo=True, status='preparing')
         try:
             job['files'], job['reference'] = create_demo(store.directory(job['id']))
             job['status'] = 'ready'
             store.save(job)
-            return job
+            return access.present(job)
         except Exception:
             store.delete(job['id'])
             raise
 
     @app.post('/api/jobs/{job_id}/start')
-    def start(job_id: str):
-        return manager.start(job_id)
+    def start(job_id: str, request: Request):
+        access.get(job_id, access.owner(request))
+        return access.present(manager.start(job_id))
 
     @app.post('/api/jobs/{job_id}/cancel')
-    def cancel(job_id: str):
+    def cancel(job_id: str, request: Request):
+        access.get(job_id, access.owner(request))
         manager.cancel(job_id)
         return {'message': 'Cancelación solicitada; se terminará el archivo actual.'}
 
     @app.delete('/api/jobs/{job_id}')
-    def delete(job_id: str):
+    def delete(job_id: str, request: Request):
+        access.get(job_id, access.owner(request))
         manager.delete(job_id)
         return {'deleted': True}
 
     @app.get('/api/jobs/{job_id}/download/{kind}')
-    def download(job_id: str, kind: str):
-        job = store.get(job_id)
+    def download(job_id: str, kind: str, request: Request):
+        job = access.get(job_id, access.owner(request))
         mapping = {'excel': ('reporte.xlsx', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'),
                    'zip': ('resultados.zip', 'application/zip')}
         if kind not in mapping or kind not in job['artifacts']:
@@ -192,8 +230,8 @@ def create_app(data_root: Path | None = None):
         return FileResponse(path, filename=name, media_type=mime)
 
     @app.get('/api/jobs/{job_id}/evidence/{file_id}/{image}')
-    def evidence(job_id: str, file_id: str, image: str):
-        job = store.get(job_id)
+    def evidence(job_id: str, file_id: str, image: str, request: Request):
+        job = access.get(job_id, access.owner(request))
         file = next((f for f in job['files'] if f['id'] == file_id), None)
         if not file or image not in [m['image'] for m in file.get('matches', [])]:
             raise HTTPException(404, 'Evidencia no encontrada.')
