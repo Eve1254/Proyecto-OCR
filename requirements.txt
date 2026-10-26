@@ -1,0 +1,10 @@
+fastapi
+uvicorn
+python-multipart
+PyMuPDF
+opencv-python-headless
+Pillow
+numpy
+openpyxl
+extract-msg
+comtypes; sys_platform == 'win32'

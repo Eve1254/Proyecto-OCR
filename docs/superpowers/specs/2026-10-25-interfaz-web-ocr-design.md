@@ -1,6 +1,6 @@
 # Interfaz web local para Proyecto OCR
 
-Estado: propuesta pendiente de aprobación. Fecha: 25 de octubre de 2026.
+Estado: aprobado por la persona usuaria el 25 de octubre de 2026; implementación autorizada.
 
 ## Propósito y decisiones de la usuaria
 
