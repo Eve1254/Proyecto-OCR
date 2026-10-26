@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Proyecto OCR · Gestor documental</title>
+  <meta name="description" content="Organiza, reconoce y clasifica documentos en tu computador.">
+  <link rel="icon" href="/icon.svg" type="image/svg+xml">
+  <link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script>
+</head>
+<body>
+<a class="skip-link" href="#main">Saltar al contenido</a>
+<svg class="icon-definitions" xmlns="http://www.w3.org/2000/svg" aria-hidden="true"><defs>
+  <symbol id="scan" viewBox="0 0 24 24"><path d="M8 3H4a1 1 0 0 0-1 1v4m13-5h4a1 1 0 0 1 1 1v4M3 16v4a1 1 0 0 0 1 1h4m8 0h4a1 1 0 0 0 1-1v-4M7 8h10M7 12h10M7 16h6"/></symbol>
+  <symbol id="files" viewBox="0 0 24 24"><path d="M8 3h8l4 4v13a1 1 0 0 1-1 1H8a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1Zm7 0v5h5M3 6v11M11 12h5m-5 4h5"/></symbol>
+  <symbol id="folder" viewBox="0 0 24 24"><path d="M3 7V5a1 1 0 0 1 1-1h5l2 3h9a1 1 0 0 1 1 1v11a1 1 0 0 1-1 1H4a1 1 0 0 1-1-1V7Zm6 7 2 2 4-4"/></symbol>
+  <symbol id="book" viewBox="0 0 24 24"><path d="M12 5c-3-2-6-2-9-1v15c3-1 6-1 9 1 3-2 6-2 9-1V4c-3-1-6-1-9 1Zm0 0v15"/></symbol>
+  <symbol id="upload" viewBox="0 0 24 24"><path d="M12 16V3m-5 5 5-5 5 5M4 15v5a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-5"/></symbol>
+  <symbol id="arrow" viewBox="0 0 24 24"><path d="M4 12h16m-6-6 6 6-6 6"/></symbol>
+  <symbol id="download" viewBox="0 0 24 24"><path d="M12 3v13m-5-5 5 5 5-5M4 16v5h16v-5"/></symbol>
+  <symbol id="monitor" viewBox="0 0 24 24"><rect x="3" y="3" width="18" height="13" rx="2"/><path d="M8 21h8m-4-5v5"/></symbol>
+</defs></svg>
+<div class="app-shell">
+  <aside class="sidebar">
+    <a class="brand" href="/"><span class="brand-mark"><svg><use href="#scan"/></svg></span><span>Proyecto OCR<small>Gestor documental</small></span></a>
+    <div class="sidebar-section"><p class="eyebrow">Espacio de trabajo</p>
+      <nav aria-label="Navegación principal">
+        <button class="nav-button active" data-view="process" aria-current="page"><svg><use href="#files"/></svg>Procesar documentos</button>
+        <button class="nav-button" data-view="results"><svg><use href="#folder"/></svg>Resultados<span id="history-count" class="nav-count">0</span></button>
+        <button class="nav-button" data-view="about"><svg><use href="#book"/></svg>El proyecto</button>
+      </nav>
+    </div>
+    <div class="sidebar-bottom"><span class="local-icon"><svg><use href="#monitor"/></svg></span><div>En tu computador<small>Archivos procesados localmente</small></div></div>
+  </aside>
+  <main id="main">
+    <header class="topbar"><span class="environment"><span class="dot"></span>Versión local <span class="version">1.0</span></span><span id="connection-status">Conectando…</span></header>
+    <div id="notice" role="alert" hidden><span id="notice-text"></span><button id="dismiss-notice" aria-label="Cerrar aviso">×</button></div>
+    <section id="view-process" class="view" aria-labelledby="process-title">
+      <div class="page-heading"><div><p class="eyebrow">Organización y reconocimiento</p><h1 id="process-title">Tus documentos,<br>en orden.</h1><p class="subtitle">Prepara tus archivos, reconoce un logotipo y organiza los resultados desde un mismo lugar.</p></div><button class="button secondary demo-button" id="demo-button">Probar con un ejemplo <svg><use href="#arrow"/></svg></button></div>
+      <ol class="steps" aria-label="Pasos del proceso"><li class="current"><span>1</span>Documentos</li><li><span>2</span>Procesos</li><li><span>3</span>Resultados</li></ol>
+      <div class="work-grid">
+        <section class="panel input-panel" aria-labelledby="input-title">
+          <div class="panel-heading"><h2 id="input-title">Documentos de entrada</h2><span id="file-count" class="muted small">Sin archivos</span></div>
+          <div id="dropzone" class="dropzone">
+            <span class="upload-icon"><svg><use href="#upload"/></svg></span>
+            <strong>Un espacio para tus documentos</strong><p>Arrastra archivos o selecciónalos desde tu equipo.</p>
+            <div class="button-row"><button class="button" id="choose-folder">Seleccionar carpeta</button><button class="button subtle" id="choose-files">Elegir archivos</button></div>
+            <span class="small muted">PDF, DOCX y mensajes de Outlook (.msg)</span>
+          </div>
+          <input id="files-input" type="file" accept=".pdf,.docx,.msg" multiple hidden>
+          <input id="folder-input" type="file" webkitdirectory multiple hidden>
+          <div id="selection-summary" hidden><div class="selection-heading"><span id="selection-size"></span><button class="text-button" id="clear-files">Quitar todos</button></div><p id="group-summary" class="small muted"></p><ul id="file-list" class="file-list" aria-label="Archivos seleccionados"></ul><p id="remaining-files" class="small muted"></p></div>
+          <p class="input-note">La carpeta seleccionada agrupa sus documentos por subcarpeta de primer nivel. Las carpetas vacías no se incluyen.</p>
+        </section>
+        <section class="panel options-panel" aria-labelledby="options-title">
+          <div class="panel-heading"><h2 id="options-title">Qué quieres hacer</h2><span class="small muted">Configura tu proceso</span></div>
+          <label class="option"><input id="opt-convert" type="checkbox" checked><span><strong>Convertir Word a PDF</strong><small id="word-status">Comprobando Microsoft Word…</small></span></label>
+          <label class="option"><input id="opt-extract" type="checkbox" checked><span><strong>Extraer adjuntos de Outlook</strong><small>Recupera los PDF de archivos .msg</small></span></label>
+          <label class="option"><input id="opt-recognize" type="checkbox" checked><span><strong>Reconocer logotipo</strong><small>Busca coincidencias con tu imagen de referencia</small></span></label>
+          <label class="option"><input id="opt-classify" type="checkbox" checked><span><strong>Clasificar carpetas</strong><small>Con logotipo, sin coincidencia o revisar</small></span></label>
+          <div class="reference-control" id="reference-control"><div class="reference-preview"><svg id="reference-placeholder"><use href="#scan"/></svg><img id="reference-preview" alt="Logotipo seleccionado" hidden></div><div class="reference-text"><strong>Logotipo de referencia</strong><span id="reference-name">PNG o JPG · hasta 10 MB</span><button id="choose-reference" class="text-button">Seleccionar imagen</button></div><input id="reference-input" type="file" accept="image/png,image/jpeg" hidden></div>
+          <div class="output-options"><label class="compact-option"><input id="opt-report" type="checkbox" checked>Generar reporte Excel</label><label class="compact-option"><input id="opt-evidence" type="checkbox" checked>Incluir evidencias en el ZIP</label></div>
+        </section>
+      </div>
+      <div class="process-footer"><p><span class="dot"></span>Trabajamos sobre copias. Tus originales se conservan.</p><button id="prepare-button" class="button primary" disabled>Preparar lote <svg><use href="#arrow"/></svg></button></div>
+      <p id="limit-note" class="small muted">Hasta 500 archivos · 50 MB por archivo · 500 MB por lote</p>
+    </section>
+    <section id="view-results" class="view" aria-labelledby="results-title" hidden>
+      <div class="page-heading compact"><div><p class="eyebrow">Tu espacio de revisión</p><h1 id="results-title">Resultados</h1><p class="subtitle">Consulta cada trabajo, revisa sus evidencias y descarga tus archivos.</p></div><button id="refresh-history" class="button">Actualizar historial</button></div>
+      <div id="results-empty" class="empty-state"><span class="upload-icon"><svg><use href="#folder"/></svg></span><h2>Tu primer resultado empieza aquí.</h2><p>Carga tus documentos o usa la demostración para conocer el proceso.</p><button class="button primary" id="empty-demo">Probar con un ejemplo</button></div>
+      <div class="results-grid" id="results-content" hidden>
+        <aside class="history"><h2>Trabajos recientes</h2><div id="history-list"></div></aside>
+        <div id="job-detail" class="job-detail" aria-live="polite"></div>
+      </div>
+    </section>
+    <section id="view-about" class="view" aria-labelledby="about-title" hidden>
+      <div class="about-hero"><p class="eyebrow">Una experiencia en automatización</p><h1 id="about-title">De scripts a<br>una herramienta.</h1><p class="subtitle">Un proyecto que reúne organización documental y visión por computador para hacer más fácil un proceso de revisión.</p></div>
+      <div class="about-grid"><section class="panel"><span class="chapter">01 / EL PUNTO DE PARTIDA</span><h2>Un proceso que pedía orden</h2><p>Archivos Word, convenios en PDF y documentos guardados como adjuntos de Outlook. El proyecto original nació para preparar esos archivos, buscar un logotipo y organizar carpetas.</p><p>Sus seis scripts de Python son la base de esta aplicación. La nueva versión conecta esas tareas en una experiencia que permite seleccionar archivos, seguir el avance y revisar resultados.</p></section><section class="panel"><span class="chapter">02 / EL RECORRIDO</span><h2>Preparar. Reconocer. Revisar.</h2><ol class="about-flow"><li><strong>Organizar</strong><span>Inventario, conversión y extracción de adjuntos.</span></li><li><strong>Reconocer</strong><span>Comparación de características visuales con SIFT.</span></li><li><strong>Revisar resultados</strong><span>Clasificación sugerida, evidencias y reporte Excel.</span></li></ol></section></div>
+      <section class="scope-panel"><div><p class="eyebrow">Un alcance claro</p><h2>Una ayuda para la revisión documental</h2></div><p>Esta versión reconoce logotipos en imágenes incrustadas en PDF. La clasificación es una sugerencia: no valida firmas ni la validez de un convenio y no extrae texto. Los casos incompletos se señalan para revisión manual.</p></section>
+      <div class="about-bottom"><p><strong>Construido con Python</strong><span>FastAPI · OpenCV · PyMuPDF · openpyxl</span></p><p><strong>El siguiente paso</strong><span>Medir resultados con documentos representativos y preparar acceso para otras personas.</span></p></div>
+    </section>
+    <footer class="app-footer"><span>Proyecto OCR</span><span>Organiza · Reconoce · Revisa</span></footer>
+  </main>
+</div>
+<dialog id="evidence-dialog"><div class="dialog-heading"><h2 id="evidence-title">Evidencia del reconocimiento</h2><button class="icon-button" id="close-evidence" aria-label="Cerrar evidencia">×</button></div><p id="evidence-description" class="small muted"></p><img id="evidence-image" alt="Imagen extraída del PDF con coincidencia del logotipo"></dialog>
+<dialog id="delete-dialog"><h2>¿Borrar este trabajo?</h2><p>Se eliminarán las copias y los resultados guardados en la aplicación. Tus archivos originales se conservan.</p><div class="button-row dialog-actions"><button class="button" id="cancel-delete">Conservar trabajo</button><button class="button danger" id="confirm-delete">Borrar trabajo</button></div></dialog>
+</body></html>

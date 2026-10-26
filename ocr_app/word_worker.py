@@ -3,7 +3,6 @@ import json
 import os
 import subprocess
 import sys
-import time
 from pathlib import Path
 
 from .config import LIMITS, PROJECT_ROOT
@@ -16,7 +15,8 @@ def convert_docx(source: Path, destination: Path, timeout=None):
     command = [sys.executable, '-m', 'ocr_app.word_worker', str(source.resolve()),
                str(destination.resolve()), str(marker.resolve())]
     process = subprocess.Popen(command, cwd=PROJECT_ROOT, stdout=subprocess.PIPE,
-                               stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW)
+                               stderr=subprocess.PIPE, creationflags=subprocess.CREATE_NO_WINDOW,
+                               env={**os.environ, 'PYTHONIOENCODING': 'utf-8'})
     try:
         stdout, stderr = process.communicate(timeout=timeout or LIMITS.word_timeout)
     except subprocess.TimeoutExpired:
@@ -48,15 +48,21 @@ def worker(source, destination, marker):
     comtypes.CoInitialize()
     try:
         word = comtypes.client.CreateObject('Word.Application', dynamic=True)
-        pid = ctypes.c_ulong()
-        ctypes.windll.user32.GetWindowThreadProcessId(word.Hwnd, ctypes.byref(pid))
-        identity = dict(pid=pid.value, created=psutil.Process(pid.value).create_time())
-        Path(marker).write_text(json.dumps(identity), encoding='utf-8')
         word.Visible = False
         word.DisplayAlerts = 0
         word.AutomationSecurity = 3
-        document = word.Documents.Open(FileName=source, ReadOnly=True,
-                                       AddToRecentFiles=False, ConfirmConversions=False)
+        word.Options.UpdateLinksAtOpen = False
+        # Word exposes Hwnd on Window, not Application. A private blank document
+        # gives an exact handle before opening the user's uploaded document.
+        document = word.Documents.Add()
+        pid = ctypes.c_ulong()
+        ctypes.windll.user32.GetWindowThreadProcessId(document.Windows.Item(1).Hwnd, ctypes.byref(pid))
+        identity = dict(pid=pid.value, created=psutil.Process(pid.value).create_time())
+        Path(marker).write_text(json.dumps(identity), encoding='utf-8')
+        document.Close(0)
+        document = None
+        # Dynamic COM dispatch uses positional arguments: filename, confirm, read-only, recent.
+        document = word.Documents.Open(source, False, True, False)
         document.ExportAsFixedFormat(destination, 17)
     finally:
         try:
