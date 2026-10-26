@@ -1,4 +1,5 @@
 import asyncio
+import time
 from urllib.parse import urlsplit
 
 from starlette.responses import JSONResponse
@@ -7,6 +8,10 @@ from .config import LIMITS
 
 
 class BodyTooLarge(Exception):
+    pass
+
+
+class BodyTimedOut(Exception):
     pass
 
 
@@ -42,16 +47,29 @@ class LocalOnlyMiddleware:
             return await JSONResponse({'detail': 'Acceso externo no permitido.'}, 403)(scope, receive, send)
         maximum = self.limits.job_bytes + self.limits.reference_bytes + 1024 * 1024
         try:
-            if int(headers.get('content-length', '0')) > maximum:
+            length = int(headers.get('content-length', '0'))
+            if length < 0:
+                raise ValueError()
+            if length > maximum:
                 return await JSONResponse({'detail': 'El lote supera el tamaño máximo permitido.'}, 413)(scope, receive, send)
         except ValueError:
             return await JSONResponse({'detail': 'Tamaño de petición no válido.'}, 400)(scope, receive, send)
         received = 0
         started = False
+        began = time.monotonic()
 
         async def bounded_receive():
             nonlocal received
-            event = await receive()
+            if public:
+                remaining = self.settings.upload_total_seconds - (time.monotonic() - began)
+                if remaining <= 0:
+                    raise BodyTimedOut()
+                try:
+                    event = await asyncio.wait_for(receive(), min(remaining, self.settings.upload_idle_seconds))
+                except TimeoutError:
+                    raise BodyTimedOut() from None
+            else:
+                event = await receive()
             if event['type'] == 'http.request':
                 received += len(event.get('body', b''))
                 if received > maximum:
@@ -81,6 +99,9 @@ class LocalOnlyMiddleware:
         except BodyTooLarge:
             if not started:
                 await JSONResponse({'detail': 'El lote supera el tamaño máximo permitido.'}, 413)(scope, receive, send)
+        except BodyTimedOut:
+            if not started:
+                await JSONResponse({'detail': 'La carga tardó demasiado. Prueba con un lote más pequeño o una conexión estable.'}, 408)(scope, receive, send)
         finally:
             if upload:
                 self.uploads.release()

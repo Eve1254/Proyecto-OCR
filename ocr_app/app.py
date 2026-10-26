@@ -4,10 +4,11 @@ import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 
-from fastapi import FastAPI, File, Form, HTTPException, Request, Response, UploadFile
-from fastapi.responses import FileResponse, JSONResponse
+from fastapi import FastAPI, HTTPException, Request, Response
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, ConfigDict, ValidationError
+from starlette.datastructures import UploadFile
 
 from .access import AccessPolicy
 from .config import DATA_ROOT, Settings, SUPPORTED
@@ -121,11 +122,25 @@ def create_app(data_root: Path | None = None, settings=None):
         return access.present(job)
 
     @app.post('/api/jobs')
-    async def upload(request: Request, files: list[UploadFile] = File(...), paths: str = Form('[]'),
-                     options: str = Form('{}'), reference: UploadFile | None = File(None)):
+    async def upload(request: Request):
         owner = access.owner(request)
         job = None
+        form = None
         try:
+            # Reserve ownership and capacity before accepting/parsing a multipart body.
+            access.cleanup(manager)
+            job = access.create({}, owner, status='uploading')
+            form = await request.form(max_files=limits.files + 1, max_fields=2, max_part_size=64 * 1024)
+            files = form.getlist('files')
+            references = form.getlist('reference')
+            if (any(key not in {'files', 'paths', 'options', 'reference'} for key in form)
+                    or any(not isinstance(file, UploadFile) for file in files + references)
+                    or len(references) > 1 or len(form.getlist('options')) > 1 or len(form.getlist('paths')) > 1):
+                raise ValueError('Los campos del lote no son válidos.')
+            reference = references[0] if references else None
+            paths, options = form.get('paths', '[]'), form.get('options', '{}')
+            if not isinstance(paths, str) or not isinstance(options, str):
+                raise ValueError('Las opciones y rutas deben ser texto.')
             try:
                 selected = Options.model_validate_json(options).model_dump()
                 names = json.loads(paths)
@@ -144,8 +159,7 @@ def create_app(data_root: Path | None = None, settings=None):
             relative_paths = [safe_relative(n) for n in (names or [f.filename or '' for f in files])]
             if any(path.suffix.lower() not in SUPPORTED for path in relative_paths):
                 raise ValueError('Solo se admiten archivos PDF, DOCX y MSG.')
-            access.cleanup(manager)
-            job = access.create(selected, owner, status='uploading')
+            job['options'] = selected
             directory = store.directory(job['id'])
             total = 0
             for uploaded, relative in zip(files, relative_paths):
@@ -180,15 +194,13 @@ def create_app(data_root: Path | None = None, settings=None):
             job['status'] = 'ready'
             store.save(job)
             return access.present(job)
-        except Exception:
+        except BaseException:
             if job:
                 store.delete(job['id'])
             raise
         finally:
-            for uploaded in files:
-                await uploaded.close()
-            if reference:
-                await reference.close()
+            if form is not None:
+                await form.close()
 
     @app.post('/api/demo')
     def demo(request: Request):
@@ -221,6 +233,22 @@ def create_app(data_root: Path | None = None, settings=None):
         manager.delete(job_id)
         return {'deleted': True}
 
+    def send_file(path, job, mime, filename=None):
+        if not settings.public:
+            return FileResponse(path, filename=filename, media_type=mime)
+        async def chunks():
+            try:
+                with path.open('rb') as source:
+                    while not access.expired(job):
+                        chunk = await asyncio.to_thread(source.read, 64 * 1024)
+                        if not chunk or access.expired(job):
+                            break
+                        yield chunk
+            except FileNotFoundError:
+                return
+        headers = {'Content-Disposition': 'attachment; filename="' + filename + '"'} if filename else {}
+        return StreamingResponse(chunks(), media_type=mime, headers=headers)
+
     @app.get('/api/jobs/{job_id}/download/{kind}')
     def download(job_id: str, kind: str, request: Request):
         job = access.get(job_id, access.owner(request))
@@ -232,7 +260,7 @@ def create_app(data_root: Path | None = None, settings=None):
         path = contained(store.directory(job_id), store.directory(job_id) / 'output' / name)
         if not path.is_file():
             raise HTTPException(404, 'El archivo de resultados ya no está disponible.')
-        return FileResponse(path, filename=name, media_type=mime)
+        return send_file(path, job, mime, name)
 
     @app.get('/api/jobs/{job_id}/evidence/{file_id}/{image}')
     def evidence(job_id: str, file_id: str, image: str, request: Request):
@@ -244,7 +272,7 @@ def create_app(data_root: Path | None = None, settings=None):
         path = contained(directory, directory / 'evidence' / file_id / image)
         if not path.is_file():
             raise HTTPException(404, 'Evidencia no disponible.')
-        return FileResponse(path, media_type='image/png')
+        return send_file(path, job, 'image/png')
 
     static = Path(__file__).parent / 'static'
     if static.is_dir():

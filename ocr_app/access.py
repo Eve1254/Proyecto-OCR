@@ -62,7 +62,7 @@ class AccessPolicy:
         except (KeyError, ValueError):
             raise HTTPException(404, 'No se encontró el trabajo.')
         if not self.visible(job, owner):
-            raise HTTPException(404, 'No se encontró el trabajo o ya expiró.')
+            raise HTTPException(404, 'No se encontró el trabajo.')
         return job
 
     def present(self, job):

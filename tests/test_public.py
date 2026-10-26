@@ -1,4 +1,5 @@
 import json
+import asyncio
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -114,6 +115,90 @@ def test_public_upload_limits_apply_before_creating_job(public_app):
                           files={'files': ('test.pdf', b'x' * (10 * 1024**2 + 1), 'application/pdf')})
     assert response.status_code == 413
     assert first.get('/api/jobs').json() == []
+
+
+def test_missing_cookie_rejected_before_multipart_parsing(public_app):
+    _, _, second = public_app
+    response = second.post('/api/jobs', content=b'not-a-multipart-body',
+                           headers={'Content-Type': 'multipart/form-data; boundary=test'})
+    assert response.status_code == 401
+
+
+def test_quota_rejected_before_multipart_parsing(public_app):
+    _, first, _ = public_app
+    session(first)
+    for _ in range(3):
+        assert first.post('/api/demo').status_code == 200
+    response = first.post('/api/jobs', content=b'not-a-multipart-body',
+                          headers={'Content-Type': 'multipart/form-data; boundary=test'})
+    assert response.status_code == 429
+
+
+def test_foreign_missing_and_expired_ids_are_indistinguishable(public_app):
+    app, first, second = public_app
+    session(first)
+    session(second)
+    job_id = first.post('/api/demo').json()['id']
+    for method, suffix in [('get', ''), ('post', '/start'), ('post', '/cancel'), ('delete', ''),
+                           ('get', '/download/zip'), ('get', '/evidence/file/image.png')]:
+        foreign = getattr(second, method)('/api/jobs/' + job_id + suffix)
+        missing = getattr(second, method)('/api/jobs/' + '0' * 32 + suffix)
+        assert foreign.status_code == missing.status_code == 404
+        assert foreign.json() == missing.json()
+
+
+def scope_for(path, cookie, method='GET', extra_headers=()):
+    return {'type': 'http', 'asgi': {'version': '3.0', 'spec_version': '2.4'}, 'http_version': '1.1',
+            'method': method, 'scheme': 'https', 'path': path, 'raw_path': path.encode(),
+            'query_string': b'', 'root_path': '', 'server': ('pilot.example', 443),
+            'client': ('127.0.0.1', 1234), 'headers': [(b'host', b'pilot.example'),
+            (b'origin', b'https://pilot.example'), (b'cookie', cookie.encode()), *extra_headers]}
+
+
+def test_stalled_upload_has_deadline_and_releases_slot(public_app):
+    app, first, _ = public_app
+    session(first)
+    app.state.settings.upload_idle_seconds = .02
+    app.state.settings.upload_total_seconds = .05
+    cookie = '; '.join(key + '=' + value for key, value in first.cookies.items())
+    async def run():
+        events = []
+        async def receive():
+            await asyncio.sleep(5)
+            return {'type': 'http.request', 'body': b'', 'more_body': False}
+        async def send(event):
+            events.append(event)
+        await asyncio.wait_for(app(scope_for('/api/jobs', cookie, 'POST',
+            [(b'content-type', b'multipart/form-data; boundary=test')]), receive, send), timeout=1)
+        return events
+    events = asyncio.run(run())
+    assert events[0]['status'] == 408
+    assert first.get('/api/jobs').json() == []
+    assert first.post('/api/demo').status_code == 200
+
+
+def test_download_stops_streaming_when_job_expires(public_app):
+    app, first, _ = public_app
+    session(first)
+    owner = app.state.access.read_cookie(type('Request', (), {'cookies': first.cookies})())
+    job = app.state.store.create({}, owner=owner)
+    path = app.state.store.directory(job['id']) / 'output/resultados.zip'
+    path.write_bytes(b'x' * (256 * 1024))
+    job['artifacts'] = ['zip']
+    app.state.store.save(job)
+    app.state.settings.retention_seconds = .15
+    cookie = '; '.join(key + '=' + value for key, value in first.cookies.items())
+    async def run():
+        chunks = []
+        async def receive():
+            return {'type': 'http.request', 'body': b'', 'more_body': False}
+        async def send(event):
+            if event['type'] == 'http.response.body' and event.get('body'):
+                chunks.append(event['body'])
+                await asyncio.sleep(.2)
+        await app(scope_for('/api/jobs/' + job['id'] + '/download/zip', cookie), receive, send)
+        return b''.join(chunks)
+    assert len(asyncio.run(run())) <= 64 * 1024
 
 
 @pytest.mark.parametrize('changes', [

@@ -35,6 +35,8 @@ class Settings:
     job_seconds: int = 180
     worker_memory_bytes: int = 340 * 1024**2
     job_storage_bytes: int = 96 * 1024**2
+    upload_total_seconds: float = 30
+    upload_idle_seconds: float = 10
 
     @classmethod
     def from_env(cls):
