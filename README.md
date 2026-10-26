@@ -14,7 +14,13 @@ Una aplicación web local para preparar documentos, reconocer logotipos en PDF y
 - Descargar un reporte Excel y un ZIP con los resultados.
 - Probar el flujo con documentos ficticios incluidos en la demostración.
 
-El nombre conserva el del proyecto original. Esta versión reconoce logotipos; todavía no extrae texto mediante OCR ni verifica firmas. La aplicación se ejecuta en el computador de quien la instala: el repositorio público comparte el código, no aloja un servicio web.
+El nombre conserva el del proyecto original. Esta versión reconoce logotipos; todavía no extrae texto mediante OCR ni verifica firmas.
+
+## Probar desde Internet
+
+La aplicación incluye un modo público para desplegar en **Render gratuito**, sin instalación para sus visitantes: sesiones anónimas separadas, archivos temporales durante una hora, cola de procesamiento y conversión de Word en el servidor. El código en GitHub por sí solo no pone el servicio en línea.
+
+Consulta la [guía del piloto de Internet](docs/internet.md) para conocer los límites y desplegarlo. La versión local sigue disponible con los pasos siguientes.
 
 ## Instalar en Windows
 
@@ -74,7 +80,7 @@ Una clasificación es una sugerencia, no una certificación de tipo de convenio.
 
 Se procesan **copias**, nunca se mueven ni borran los originales de entrada. Los trabajos y resultados permanecen en `data/jobs/`, excluido de Git. Borrar un trabajo desde la aplicación elimina únicamente esas copias y resultados y requiere confirmación.
 
-La aplicación escucha exclusivamente en `127.0.0.1`. No tiene cuentas de usuario ni está preparada para exponerse directamente a Internet o a una red compartida. La futura versión multiusuario requiere autenticación, separación de archivos y otro diseño de ejecución. La automatización de Word utilizada aquí pertenece a la sesión local de Windows; no debe trasladarse sin cambios a un servidor.
+El lanzador local escucha exclusivamente en `127.0.0.1`. Para publicar el piloto se utiliza un lanzador distinto, sesiones separadas, límites de recursos y LibreOffice en un contenedor. No expongas el servidor local cambiando únicamente su dirección de escucha. La automatización local de Microsoft Word se conserva para Windows.
 
 Las carpetas numeradas del repositorio conservan los scripts originales como referencia histórica. El código nuevo, ubicado en `ocr_app/`, adapta su lógica en servicios separados, elimina las rutas fijas y añade validaciones, interfaz y pruebas. Para usar la versión actual ejecuta los lanzadores de la raíz; los scripts históricos contienen rutas fijas y operaciones directas sobre archivos.
 
@@ -85,7 +91,7 @@ La herramienta nació de un proceso de automatización documental y evolucionó 
 - [Historia, aprendizajes y texto para portafolio](docs/experiencia.md).
 - [Validación funcional y pruebas realizadas](docs/validacion.md).
 
-Las siguientes etapas son validar documentos representativos, medir el reconocimiento y preparar acceso compartido con autenticación y separación de archivos por usuario.
+Las siguientes etapas son validar documentos representativos, medir el reconocimiento y recoger comentarios del piloto público. Las cuentas personales y el almacenamiento permanente quedan fuera de esta primera prueba.
 
 ## Desarrollo y pruebas
 
