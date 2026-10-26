@@ -67,7 +67,7 @@ $env:OCR_TEST_WORD='1'
 Remove-Item Env:OCR_TEST_WORD
 ```
 
-Las pruebas usan documentos ficticios y directorios temporales. La prueba opcional de Word abre y cierra una instancia propia; no se conecta a una instancia que tenga abierta la persona usuaria. La extracción MSG se comprueba a través de su adaptador; todavía conviene validar archivos MSG representativos de tu flujo real.
+Las pruebas usan documentos ficticios y directorios temporales. La prueba opcional de Word abre y cierra una instancia propia; no se conecta a una instancia que tenga abierta la persona usuaria. La extracción MSG se comprueba con un archivo MSG sintético real y con adjuntos defectuosos y repetidos; todavía conviene validar archivos representativos de tu flujo real.
 
 Inicio sin abrir automáticamente el navegador: `python run.py --no-browser --port 8765`. Para separar datos durante desarrollo define `OCR_DATA_DIR` con una carpeta de trabajos. No arranques varias aplicaciones distintas sobre la misma carpeta mediante comandos alternativos al lanzador.
 

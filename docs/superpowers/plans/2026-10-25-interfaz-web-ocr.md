@@ -33,40 +33,40 @@
 **Files:** `ocr_app/storage.py`, `ocr_app/config.py`, `tests/test_storage.py`, `requirements.txt`, `requirements-dev.txt`.
 **Interfaces:** `JobStore(root: Path)`, `create(options: dict, demo=False) -> dict`, `get(job_id) -> dict`, `save(job)`, `directory(job_id) -> Path`, `delete(job_id)`; `safe_relative(name: str) -> Path`, `unique_path(root: Path, relative: Path) -> Path`.
 
-- [ ] Escribir pruebas parametrizadas: rechazar `../a.pdf`, `C:/a.pdf`, `/a.pdf`, `x/CON.pdf`, `a:stream.pdf`, `a./b.pdf`; preservar `Álvaro/a.pdf`; nombres repetidos distintos; JSON persiste y reinicio marca trabajos activos interrumpidos.
-- [ ] Ejecutar `python -m pytest tests/test_storage.py -q`: falla por implementación ausente.
-- [ ] Implementar validación de rutas/nombres, directorios de trabajo y persistencia atómica, sin efectos fuera del almacén.
-- [ ] Ejecutar la prueba: debe pasar; commit de la tarea.
+- [x] Escribir pruebas parametrizadas: rechazar `../a.pdf`, `C:/a.pdf`, `/a.pdf`, `x/CON.pdf`, `a:stream.pdf`, `a./b.pdf`; preservar `Álvaro/a.pdf`; nombres repetidos distintos; JSON persiste y reinicio marca trabajos activos interrumpidos.
+- [x] Ejecutar `python -m pytest tests/test_storage.py -q`: falla por implementación ausente.
+- [x] Implementar validación de rutas/nombres, directorios de trabajo y persistencia atómica, sin efectos fuera del almacén.
+- [x] Ejecutar la prueba: debe pasar; commit de la tarea.
 
 ### Task 2: Procesamiento documental
 
 **Files:** `ocr_app/recognition.py`, `ocr_app/processing.py`, `ocr_app/word_worker.py`, `ocr_app/demo.py`, `ocr_app/reports.py`, `tests/test_processing.py`.
 **Interfaces:** `inspect_pdf(path, reference, evidence_dir) -> dict`; `run_pipeline(store, job_id, cancelled: Event) -> None`; `create_demo(job_dir) -> (list[dict], str)`; `write_report(job, directory) -> Path`.
 
-- [ ] Crear PDFs reproducibles con imagen coincidente, imagen distinta, sin imágenes y corrupto. Probar que producen match/no_match/review/review; referencia vacía se rechaza.
-- [ ] Probar que DOCX/MSG omitido mantiene grupo en review; ZIP conserva originales; celdas de Excel que empiezan por `=` son texto; adjuntos con nombres repetidos no se pisan.
-- [ ] Ejecutar `python -m pytest tests/test_processing.py -q`: falla por motor ausente.
-- [ ] Implementar reconocimiento SIFT, extracción MSG, conversión aislada Word, clasificación conservadora, reporte y ZIP; entradas/derivados guardan rutas y grupo explícitos.
-- [ ] Ejecutar suite y confirmar resultados de demo; commit de la tarea.
+- [x] Crear PDFs reproducibles con imagen coincidente, imagen distinta, sin imágenes y corrupto. Probar que producen match/no_match/review/review; referencia vacía se rechaza.
+- [x] Probar que DOCX/MSG omitido mantiene grupo en review; ZIP conserva originales; celdas de Excel que empiezan por `=` son texto; adjuntos con nombres repetidos no se pisan.
+- [x] Ejecutar `python -m pytest tests/test_processing.py -q`: falla por motor ausente.
+- [x] Implementar reconocimiento SIFT, extracción MSG, conversión aislada Word, clasificación conservadora, reporte y ZIP; entradas/derivados guardan rutas y grupo explícitos.
+- [x] Ejecutar suite y confirmar resultados de demo; commit de la tarea.
 
 ### Task 3: API local, trabajos y controles
 
 **Files:** `ocr_app/app.py`, `ocr_app/jobs.py`, `tests/test_api.py`.
 **Interfaces:** `create_app(data_root: Path | None = None) -> FastAPI`; `GET /api/health`, `GET/POST /api/jobs`, `POST /api/demo`, `GET /api/jobs/{id}`, `POST /api/jobs/{id}/start`, `/cancel`, `DELETE /api/jobs/{id}`, `GET /api/jobs/{id}/download/{kind}`, evidencia por ID de archivo y nombre validado.
 
-- [ ] Probar carga multipart con rutas relativas, límites con ajustes de test, rechazo de origen externo, demo hasta estado terminal y descargas ZIP/XLSX válidas; rechazo de dos inicios y borrado de trabajo activo.
-- [ ] Ejecutar `python -m pytest tests/test_api.py -q`: falla por API ausente.
-- [ ] Implementar carga en bloques, validación, un hilo de procesamiento, historial persistente, cancelación y borrado acotado; middleware de acceso local.
-- [ ] Ejecutar suite completa; commit de la tarea.
+- [x] Probar carga multipart con rutas relativas, límites con ajustes de test, rechazo de origen externo, demo hasta estado terminal y descargas ZIP/XLSX válidas; rechazo de dos inicios y borrado de trabajo activo.
+- [x] Ejecutar `python -m pytest tests/test_api.py -q`: falla por API ausente.
+- [x] Implementar carga en bloques, validación, un hilo de procesamiento, historial persistente, cancelación y borrado acotado; middleware de acceso local.
+- [x] Ejecutar suite completa; commit de la tarea.
 
 ### Task 4: Interfaz, inicio y entrega verificable
 
 **Files:** `ocr_app/static/index.html`, `styles.css`, `app.js`, `run.py`, `Iniciar OCR.cmd`, `Preparar OCR.cmd`, `README.md`, `docs/experiencia.md`, `tests/test_word.py`.
 **Interfaces:** frontend usa API de tarea 3; `run.py --no-browser --port N` inicia loopback; launcher usa `.venv` y muestra errores de instalación.
 
-- [ ] Escribir prueba de DOCX ficticio mediante OOXML mínimo y conversión real opcional `OCR_TEST_WORD=1`; timeout prueba con proceso controlado sin matar Word ajeno.
-- [ ] Ejecutar prueba de conversión; implementar/ajustar adaptador si procede. La prueba real debe producir PDF legible.
-- [ ] Implementar diseño aprobado, selección de carpeta/archivos con grupos visibles, opciones, logo, demo, progreso/cancelación, historial, detalle, evidencia, descargas y confirmación de borrado.
-- [ ] Crear lanzadores, dependencias fijadas y documentación de uso y experiencia con límites reales.
-- [ ] Verificar navegador: demo, carga real de fixtures, navegación/teclado, errores, descargas y disposición estrecha. Ejecutar `python -m pytest -q`, `node --check ocr_app/static/app.js`, `git diff --check`.
-- [ ] Revisión independiente del conjunto, resolver fallos materiales con regresiones; commit final. Abrir aplicación para la persona usuaria y entregar rutas e instrucciones concisas.
+- [x] Escribir prueba de DOCX ficticio mediante OOXML mínimo y conversión real opcional `OCR_TEST_WORD=1`; timeout prueba con proceso controlado sin matar Word ajeno.
+- [x] Ejecutar prueba de conversión; implementar/ajustar adaptador si procede. La prueba real debe producir PDF legible.
+- [x] Implementar diseño aprobado, selección de carpeta/archivos con grupos visibles, opciones, logo, demo, progreso/cancelación, historial, detalle, evidencia, descargas y confirmación de borrado.
+- [x] Crear lanzadores, dependencias fijadas y documentación de uso y experiencia con límites reales.
+- [x] Verificar navegador: demo, carga real de fixtures, navegación/teclado, errores, descargas y disposición estrecha. Ejecutar `python -m pytest -q`, `node --check ocr_app/static/app.js`, `git diff --check`.
+- [x] Revisión independiente del conjunto, resolver fallos materiales con regresiones; commit final. Abrir aplicación para la persona usuaria y entregar rutas e instrucciones concisas.

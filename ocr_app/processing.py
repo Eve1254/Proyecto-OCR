@@ -7,7 +7,7 @@ from pathlib import Path
 from .config import LIMITS
 from .recognition import inspect_pdf, load_reference
 from .reports import write_report
-from .storage import JobStore, contained, now, unique_path
+from .storage import JobStore, contained, group_key, now, unique_path
 from .word_worker import convert_docx
 
 
@@ -15,10 +15,11 @@ class Cancelled(Exception):
     pass
 
 
-def file_record(path: Path, directory: Path, relative: str, group: str, original=True):
+def file_record(path: Path, directory: Path, relative: str, group: str, original=True, group_id=None):
     return dict(id=uuid.uuid4().hex, path=path.relative_to(directory).as_posix(), relative=relative,
                 group=group, kind=path.suffix.lower()[1:], size=path.stat().st_size,
-                original=original, state='pending', message='', matches=[])
+                original=original, group_key=group_id or 'folder:' + group.casefold(),
+                state='pending', message='', matches=[])
 
 
 def attachment_name(name, index):
@@ -56,7 +57,7 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
             path.unlink(missing_ok=True)
             raise ValueError('Se alcanzó el límite de archivos generados.')
         relative = path.relative_to(directory / 'derived').as_posix()
-        record = file_record(path, directory, relative, parent['group'], original=False)
+        record = file_record(path, directory, relative, parent['group'], original=False, group_id=group_key(parent))
         job['files'].append(record)
 
     try:
@@ -86,20 +87,26 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
                     try:
                         for number, attachment in enumerate(message.attachments, start=1):
                             checkpoint()
-                            name = attachment.longFilename or attachment.shortFilename or ''
-                            if not str(name).lower().endswith('.pdf'):
-                                continue
-                            data = attachment.data
-                            if not isinstance(data, bytes) or len(data) > LIMITS.file_bytes:
-                                raise ValueError('Adjunto PDF no compatible o demasiado grande.')
-                            folder = relative_parent / (Path(file['relative']).stem[:50] + '_adjuntos')
-                            target = unique_path(directory / 'derived', folder / attachment_name(name, number))
-                            target.write_bytes(data)
-                            register(target, file)
-                            extracted += 1
+                            try:
+                                name = str(attachment.longFilename or attachment.shortFilename or '').rstrip('\x00')
+                                if not str(name).lower().endswith('.pdf'):
+                                    continue
+                                data = attachment.data
+                                if not isinstance(data, bytes) or len(data) > LIMITS.file_bytes:
+                                    raise ValueError('Adjunto PDF no compatible o demasiado grande.')
+                                folder = relative_parent / (Path(file['relative']).stem[:50] + '_adjuntos')
+                                target = unique_path(directory / 'derived', folder / attachment_name(name, number))
+                                target.write_bytes(data)
+                                register(target, file)
+                                extracted += 1
+                            except Exception as error:
+                                problem(file, f'Adjunto {number}: {error}')
                     finally:
                         message.close()
-                    file.update(state='processed', message=f'{extracted} adjuntos PDF extraídos.')
+                    if file['state'] == 'review':
+                        file['message'] += f' Se recuperaron {extracted} adjuntos PDF válidos.'
+                    else:
+                        file.update(state='processed', message=f'{extracted} adjuntos PDF extraídos.')
             except Cancelled:
                 raise
             except Exception as error:
@@ -120,8 +127,9 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
             store.save(job)
         stage('Organizando resultados')
         job['groups'] = []
-        for name in dict.fromkeys(f['group'] for f in job['files']):
-            files = [f for f in job['files'] if f['group'] == name]
+        for key in dict.fromkeys(group_key(f) for f in job['files']):
+            files = [f for f in job['files'] if group_key(f) == key]
+            name = files[0]['group']
             pdfs = [f for f in files if f['kind'] == 'pdf']
             if not options.get('classify'):
                 state = 'unclassified'
@@ -131,19 +139,19 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
                 state = 'match'
             else:
                 state = 'no_match'
-            job['groups'].append(dict(name=name, state=state))
+            job['groups'].append(dict(id=key, name=name, state=state))
         if options.get('report', True):
             write_report(job, directory)
             job['artifacts'].append('excel')
         stage('Creando paquete de resultados')
         categories = {'review': 'Revisar', 'match': 'Con logotipo', 'no_match': 'Sin coincidencia', 'unclassified': 'Sin clasificar'}
-        groups = {g['name']: categories[g['state']] for g in job['groups']}
+        groups = {g['id']: categories[g['state']] for g in job['groups']}
         target = directory / 'output/resultados.zip'
         with zipfile.ZipFile(target, 'w', zipfile.ZIP_DEFLATED) as archive:
             for file in job['files']:
                 checkpoint()
                 origin = 'Originales' if file['original'] else 'Generados'
-                arcname = f"{groups[file['group']]}/{origin}/{file['relative']}"
+                arcname = f"{groups[group_key(file)]}/{origin}/{file['relative']}"
                 archive.write(contained(directory, directory / file['path']), arcname)
             if options.get('evidence', True):
                 for file in job['files']:

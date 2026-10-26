@@ -14,6 +14,10 @@ def now():
     return datetime.now(timezone.utc).isoformat()
 
 
+def group_key(file: dict) -> str:
+    return file.get('group_key', 'folder:' + file['group'].casefold())
+
+
 def safe_relative(name: str) -> Path:
     if not name or len(name) > 180 or name.startswith('/') or '\\' in name:
         raise ValueError('La ruta del archivo no es válida o es demasiado larga.')
@@ -59,7 +63,7 @@ class JobStore:
         self.root.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
         for job in self.list():
-            if job['status'] in {'running', 'cancelling', 'uploading'}:
+            if job['status'] in {'running', 'cancelling', 'uploading', 'preparing'}:
                 job.update(status='interrupted', stage='Interrumpido por cierre de la aplicación')
                 job['logs'].append('El trabajo se interrumpió. Crea uno nuevo para repetir el proceso.')
                 self.save(job)
@@ -69,8 +73,8 @@ class JobStore:
             raise ValueError('Identificador de trabajo no válido.')
         return contained(self.root, self.root / job_id)
 
-    def create(self, options: dict, demo=False) -> dict:
-        job = dict(id=uuid.uuid4().hex, created=now(), status='ready', stage='Preparado',
+    def create(self, options: dict, demo=False, status='ready') -> dict:
+        job = dict(id=uuid.uuid4().hex, created=now(), status=status, stage='Preparado',
                    demo=demo, options=options, files=[], groups=[], errors=[], logs=[],
                    progress={'done': 0, 'total': 0}, reference=None, artifacts=[],
                    name='Demostración' if demo else 'Mis documentos')

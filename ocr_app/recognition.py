@@ -50,7 +50,8 @@ def inspect_pdf(path: Path, reference, evidence_dir: Path) -> dict:
                             raise ValueError('Imagen incrustada demasiado grande.')
                         features = descriptors(data)
                         result['images'] += 1
-                        if features is None or len(features) < 2:
+                        if features is None or len(features) < 12:
+                            failures.append(f'Página {page_number}, imagen {image_number}: sin detalles suficientes para comparar.')
                             continue
                         matcher = cv2.FlannBasedMatcher(dict(algorithm=1, trees=5), dict(checks=50))
                         pairs = matcher.knnMatch(reference, features, k=2)

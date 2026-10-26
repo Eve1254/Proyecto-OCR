@@ -9,7 +9,7 @@ from PIL import Image
 from ocr_app.storage import JobStore
 from ocr_app.recognition import inspect_pdf, load_reference
 from ocr_app.processing import run_pipeline
-from tests.factories import picture, pdf, entry
+from tests.factories import picture, pdf, entry, synthetic_msg
 
 
 def test_recognition_distinguishes_match_nonmatch_and_unreadable(tmp_path):
@@ -35,6 +35,16 @@ def test_reference_without_features_is_rejected(tmp_path):
     Image.new('RGB', (100, 100), 'white').save(path)
     with pytest.raises(ValueError):
         load_reference(path)
+
+
+def test_featureless_embedded_image_requires_review(tmp_path):
+    reference = tmp_path / 'reference.png'
+    reference.write_bytes(picture())
+    image = io.BytesIO()
+    Image.new('RGB', (200, 200), 'white').save(image, format='PNG')
+    document = pdf(tmp_path / 'blank-image.pdf', image.getvalue())
+    result = inspect_pdf(document, load_reference(reference), tmp_path / 'evidence')
+    assert result['state'] == 'review'
 
 
 def test_incomplete_group_is_not_confidently_classified_and_exports_are_valid(tmp_path):
@@ -105,3 +115,51 @@ def test_cancel_before_processing_leaves_originals_and_terminal_state(tmp_path):
     cancelled.set()
     run_pipeline(store, job['id'], cancelled)
     assert store.get(job['id'])['status'] == 'cancelled'
+
+
+def test_bad_msg_attachment_does_not_suppress_later_pdf(tmp_path, monkeypatch):
+    import extract_msg
+    data = pdf(tmp_path / 'source.pdf', picture()).read_bytes()
+    class Bad:
+        longFilename = 'bad.pdf'
+        shortFilename = None
+        data = None
+    class Good:
+        longFilename = 'good.pdf'
+        shortFilename = None
+    good = Good()
+    good.data = data
+    class Message:
+        attachments = [Bad(), good]
+        def __init__(self, path): pass
+        def close(self): pass
+    monkeypatch.setattr(extract_msg, 'Message', Message)
+    store = JobStore(tmp_path / 'jobs')
+    job = store.create(dict(extract=True, recognize=False, classify=False, report=True))
+    directory = store.directory(job['id'])
+    source = directory / 'input/message.msg'
+    source.write_bytes(b'msg')
+    job['files'] = [entry(source, 'message.msg')]
+    store.save(job)
+    run_pipeline(store, job['id'], threading.Event())
+    result = store.get(job['id'])
+    generated = [file for file in result['files'] if not file['original']]
+    assert len(generated) == 1
+    assert (directory / generated[0]['path']).read_bytes() == data
+    assert result['files'][0]['state'] == 'review'
+
+
+def test_real_msg_parser_recovers_fictional_pdf_attachment(tmp_path):
+    store = JobStore(tmp_path / 'jobs')
+    job = store.create(dict(extract=True, recognize=False, classify=False, report=True))
+    directory = store.directory(job['id'])
+    data = pdf(tmp_path / 'source.pdf', picture()).read_bytes()
+    source = synthetic_msg(directory / 'input/demo.msg', data)
+    job['files'] = [entry(source, 'demo.msg')]
+    store.save(job)
+    run_pipeline(store, job['id'], threading.Event())
+    result = store.get(job['id'])
+    assert result['status'] == 'completed', result['errors']
+    generated = [file for file in result['files'] if not file['original']]
+    assert len(generated) == 1
+    assert (directory / generated[0]['path']).read_bytes() == data

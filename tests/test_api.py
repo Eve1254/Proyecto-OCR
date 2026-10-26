@@ -97,3 +97,43 @@ def test_one_job_at_a_time_and_no_deletion_while_running(client, monkeypatch):
         assert client.post(f'/api/jobs/{first}/cancel').status_code == 200
     finally:
         release.set()
+
+
+def test_preparing_demo_cannot_start_or_be_deleted(client, monkeypatch):
+    import ocr_app.app as app_module
+    entered, release = threading.Event(), threading.Event()
+    real = app_module.create_demo
+    def blocked(directory):
+        entered.set()
+        release.wait(10)
+        return real(directory)
+    monkeypatch.setattr(app_module, 'create_demo', blocked)
+    from concurrent.futures import ThreadPoolExecutor
+    with ThreadPoolExecutor(1) as pool:
+        request = pool.submit(client.post, '/api/demo')
+        try:
+            assert entered.wait(5)
+            job_id = client.get('/api/jobs').json()[0]['id']
+            assert client.post(f'/api/jobs/{job_id}/start').status_code == 409
+            assert client.delete(f'/api/jobs/{job_id}').status_code == 409
+        finally:
+            release.set()
+        assert request.result().status_code == 200
+
+
+def test_root_files_and_folder_named_archivos_sueltos_remain_distinct(client, tmp_path):
+    same = pdf(tmp_path / 'match.pdf', picture()).read_bytes()
+    other = pdf(tmp_path / 'other.pdf', picture(46)).read_bytes()
+    response = client.post('/api/jobs', data={'paths': json.dumps(['match.pdf', 'Archivos sueltos/other.pdf'])},
+        files=[('files', ('match.pdf', same, 'application/pdf')), ('files', ('other.pdf', other, 'application/pdf')),
+               ('reference', ('logo.png', picture(), 'image/png'))])
+    assert response.status_code == 200, response.text
+    job_id = response.json()['id']
+    assert client.post(f'/api/jobs/{job_id}/start').status_code == 200
+    deadline = time.monotonic() + 30
+    while time.monotonic() < deadline:
+        job = client.get(f'/api/jobs/{job_id}').json()
+        if job['status'] != 'running': break
+        time.sleep(.1)
+    assert len(job['groups']) == 2
+    assert {g['state'] for g in job['groups']} == {'match', 'no_match'}

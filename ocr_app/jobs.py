@@ -47,9 +47,9 @@ class JobManager:
 
     def delete(self, job_id):
         with self.lock:
-            if self.active == job_id:
+            job = self.store.get(job_id)
+            if self.active == job_id or job['status'] in {'preparing', 'uploading'}:
                 raise BusyError('Espera a que termine la cancelación antes de borrar el trabajo.')
-            self.store.get(job_id)
             self.store.delete(job_id)
 
     def close(self):

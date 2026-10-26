@@ -34,8 +34,9 @@
   <main id="main">
     <header class="topbar"><span class="environment"><span class="dot"></span>Versión local <span class="version">1.0</span></span><span id="connection-status">Conectando…</span></header>
     <div id="notice" role="alert" hidden><span id="notice-text"></span><button id="dismiss-notice" aria-label="Cerrar aviso">×</button></div>
+    <div id="live-status" class="visually-hidden" role="status"></div>
     <section id="view-process" class="view" aria-labelledby="process-title">
-      <div class="page-heading"><div><p class="eyebrow">Organización y reconocimiento</p><h1 id="process-title">Tus documentos,<br>en orden.</h1><p class="subtitle">Prepara tus archivos, reconoce un logotipo y organiza los resultados desde un mismo lugar.</p></div><button class="button secondary demo-button" id="demo-button">Probar con un ejemplo <svg><use href="#arrow"/></svg></button></div>
+      <div class="page-heading"><div><p class="eyebrow">Organización y reconocimiento</p><h1 id="process-title">Tus documentos, <br>en orden.</h1><p class="subtitle">Prepara tus archivos, reconoce un logotipo y organiza los resultados desde un mismo lugar.</p></div><button class="button secondary demo-button" id="demo-button">Probar con un ejemplo <svg><use href="#arrow"/></svg></button></div>
       <ol class="steps" aria-label="Pasos del proceso"><li class="current"><span>1</span>Documentos</li><li><span>2</span>Procesos</li><li><span>3</span>Resultados</li></ol>
       <div class="work-grid">
         <section class="panel input-panel" aria-labelledby="input-title">
@@ -69,7 +70,7 @@
       <div id="results-empty" class="empty-state"><span class="upload-icon"><svg><use href="#folder"/></svg></span><h2>Tu primer resultado empieza aquí.</h2><p>Carga tus documentos o usa la demostración para conocer el proceso.</p><button class="button primary" id="empty-demo">Probar con un ejemplo</button></div>
       <div class="results-grid" id="results-content" hidden>
         <aside class="history"><h2>Trabajos recientes</h2><div id="history-list"></div></aside>
-        <div id="job-detail" class="job-detail" aria-live="polite"></div>
+        <div id="job-detail" class="job-detail"></div>
       </div>
     </section>
     <section id="view-about" class="view" aria-labelledby="about-title" hidden>

@@ -108,9 +108,7 @@ def create_app(data_root: Path | None = None):
             relative_paths = [safe_relative(n) for n in (names or [f.filename or '' for f in files])]
             if any(path.suffix.lower() not in SUPPORTED for path in relative_paths):
                 raise ValueError('Solo se admiten archivos PDF, DOCX y MSG.')
-            job = store.create(selected)
-            job['status'] = 'uploading'
-            store.save(job)
+            job = store.create(selected, status='uploading')
             directory = store.directory(job['id'])
             total = 0
             for uploaded, relative in zip(files, relative_paths):
@@ -127,7 +125,8 @@ def create_app(data_root: Path | None = None):
                     raise ValueError('El archivo está vacío: ' + str(relative))
                 actual = target.relative_to(directory / 'input')
                 group = actual.parts[0] if len(actual.parts) > 1 else 'Archivos sueltos'
-                job['files'].append(file_record(target, directory, actual.as_posix(), group))
+                key = 'folder:' + actual.parts[0].casefold() if len(actual.parts) > 1 else 'root:'
+                job['files'].append(file_record(target, directory, actual.as_posix(), group, group_id=key))
             if reference is not None and selected['recognize']:
                 extension = Path(reference.filename or '').suffix.lower()
                 if extension not in {'.png', '.jpg', '.jpeg'}:
@@ -155,9 +154,10 @@ def create_app(data_root: Path | None = None):
 
     @app.post('/api/demo')
     def demo():
-        job = store.create(Options(convert=False, extract=False).model_dump(), demo=True)
+        job = store.create(Options(convert=False, extract=False).model_dump(), demo=True, status='preparing')
         try:
             job['files'], job['reference'] = create_demo(store.directory(job['id']))
+            job['status'] = 'ready'
             store.save(job)
             return job
         except Exception:

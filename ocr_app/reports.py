@@ -2,6 +2,7 @@ from pathlib import Path
 
 from openpyxl import Workbook
 from openpyxl.styles import Alignment, Font, PatternFill
+from .storage import group_key
 
 LABELS = {'match': 'Con logotipo', 'no_match': 'Sin coincidencia', 'review': 'Revisar',
           'unclassified': 'Sin clasificar', 'processed': 'Preparado', 'skipped': 'Omitido', 'pending': 'Pendiente'}
@@ -22,7 +23,7 @@ def write_report(job: dict, directory: Path) -> Path:
     folders = workbook.create_sheet('Carpetas')
     folders.append(['Carpeta', 'Archivos originales', 'Archivos generados', 'Resultado'])
     for group in job['groups']:
-        files = [f for f in job['files'] if f['group'] == group['name']]
+        files = [f for f in job['files'] if group_key(f) == group['id']]
         folders.append([group['name'], sum(f['original'] for f in files),
                         sum(not f['original'] for f in files), LABELS[group['state']]])
     files = workbook.create_sheet('Archivos')
