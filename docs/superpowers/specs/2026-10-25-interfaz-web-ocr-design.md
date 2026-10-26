@@ -10,9 +10,9 @@ La primera entrega será una aplicación funcional para una persona, con datos d
 
 ## Punto de partida
 
-Los originales están en `C:/Users/evely/Downloads/ESTUDIO/PROCESO PRACTICANTE/PROCESO PRACTICANTE/Proyecto OCR/`. Son seis scripts separados, sin interfaz, manifiesto de dependencias ni pruebas. Sus funciones son convertir DOCX con Microsoft Word, contar elementos de carpetas en Excel, extraer adjuntos PDF de MSG, comparar imágenes incrustadas en PDF con un logotipo de referencia usando SIFT, mover carpetas según las imágenes encontradas y borrar las carpetas temporales.
+El proyecto original contiene seis scripts separados, sin interfaz, manifiesto de dependencias ni pruebas. Sus funciones son convertir DOCX con Microsoft Word, contar elementos de carpetas en Excel, extraer adjuntos PDF de MSG, comparar imágenes incrustadas en PDF con un logotipo de referencia usando SIFT, mover carpetas según las imágenes encontradas y borrar las carpetas temporales.
 
-Varios scripts se ejecutan al importarlos y contienen rutas fijas de un computador anterior. No se importarán ni ejecutarán directamente. La aplicación se construirá en `C:/Users/evely/Documents/ChatGPT/OCR/`, aprovechando y adaptando los algoritmos. Los originales de Downloads se conservarán.
+Varios scripts se ejecutan al importarlos y contienen rutas fijas de un computador anterior. No se importarán ni ejecutarán directamente. La aplicación se construirá en un espacio de trabajo separado, aprovechando y adaptando los algoritmos. Los archivos originales se conservarán.
 
 Se verificó Python 3.14.3 y Microsoft Word en este computador. Las dependencias del proyecto aún deben instalarse en un entorno aislado. No hay motor de extracción de texto ni de validación de firmas en los scripts. El documento histórico describe algunas aspiraciones adicionales; no se interpretan como funciones ya implementadas ni como instrucciones para ejecutar operaciones sobre archivos.
 

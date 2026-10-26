@@ -2,7 +2,34 @@
 
 Una aplicación web local para preparar documentos, reconocer logotipos en PDF y revisar una clasificación sugerida. Recupera el flujo del proyecto original de Python mediante una interfaz en español.
 
-## Abrir en este computador
+![Interfaz de Proyecto OCR](docs/screenshots/proyecto-ocr.png)
+
+**Python · FastAPI · OpenCV · Microsoft Word · HTML/CSS/JavaScript**
+
+## Qué puedes hacer
+
+- Convertir documentos Word a PDF y recuperar adjuntos PDF de Outlook.
+- Comparar imágenes de documentos con un logotipo de referencia.
+- Revisar la clasificación, las evidencias y las incidencias de cada lote.
+- Descargar un reporte Excel y un ZIP con los resultados.
+- Probar el flujo con documentos ficticios incluidos en la demostración.
+
+El nombre conserva el del proyecto original. Esta versión reconoce logotipos; todavía no extrae texto mediante OCR ni verifica firmas. La aplicación se ejecuta en el computador de quien la instala: el repositorio público comparte el código, no aloja un servicio web.
+
+## Instalar en Windows
+
+1. Instala **Python 3.14** con el lanzador `py`. Para convertir DOCX también necesitas **Microsoft Word de escritorio**.
+2. Descarga el repositorio con **Code → Download ZIP** y extrae la carpeta, o clónalo:
+
+   ```powershell
+   git clone https://github.com/Eve1254/Proyecto-OCR.git
+   cd Proyecto-OCR
+   ```
+
+3. Ejecuta **Preparar OCR.cmd**. La primera instalación requiere conexión a Internet para descargar las dependencias.
+4. Ejecuta **Iniciar OCR.cmd** y pulsa **Probar con un ejemplo**.
+
+## Abrir la aplicación
 
 1. Abre **Iniciar OCR.cmd** con doble clic.
 2. Se abrirá el navegador, normalmente en `http://127.0.0.1:8765`.
@@ -10,7 +37,7 @@ Una aplicación web local para preparar documentos, reconocer logotipos en PDF y
 
 Si ya hay una instancia abierta, el lanzador vuelve a abrir su dirección. Si otro programa usa el puerto inicial, se elige uno libre entre los 20 siguientes; la dirección aparece en la ventana de inicio.
 
-El entorno `.venv` ya se preparó en este computador. Para una instalación nueva usa **Preparar OCR.cmd**: requiere Python 3.14, conexión a Internet para instalar dependencias y, para convertir DOCX, Microsoft Word para Windows. Después de instalar, el procesamiento funciona localmente, sin servicios externos.
+Después de instalar, el procesamiento funciona localmente, sin servicios externos. No es necesario volver a preparar el entorno cada vez que abres la aplicación.
 
 ## Primera prueba
 
@@ -49,7 +76,16 @@ Se procesan **copias**, nunca se mueven ni borran los originales de entrada. Los
 
 La aplicación escucha exclusivamente en `127.0.0.1`. No tiene cuentas de usuario ni está preparada para exponerse directamente a Internet o a una red compartida. La futura versión multiusuario requiere autenticación, separación de archivos y otro diseño de ejecución. La automatización de Word utilizada aquí pertenece a la sesión local de Windows; no debe trasladarse sin cambios a un servidor.
 
-Los scripts antiguos de Downloads se conservaron. El código nuevo adapta su lógica en servicios separados, elimina las rutas fijas y añade validaciones, interfaz y pruebas.
+Las carpetas numeradas del repositorio conservan los scripts originales como referencia histórica. El código nuevo, ubicado en `ocr_app/`, adapta su lógica en servicios separados, elimina las rutas fijas y añade validaciones, interfaz y pruebas. Para usar la versión actual ejecuta los lanzadores de la raíz; los scripts históricos contienen rutas fijas y operaciones directas sobre archivos.
+
+## El proyecto como experiencia
+
+La herramienta nació de un proceso de automatización documental y evolucionó hacia una aplicación con interfaz, procesamiento por lotes y revisión de resultados. La versión web se desarrolló con asistencia de IA sobre el proyecto original.
+
+- [Historia, aprendizajes y texto para portafolio](docs/experiencia.md).
+- [Validación funcional y pruebas realizadas](docs/validacion.md).
+
+Las siguientes etapas son validar documentos representativos, medir el reconocimiento y preparar acceso compartido con autenticación y separación de archivos por usuario.
 
 ## Desarrollo y pruebas
 

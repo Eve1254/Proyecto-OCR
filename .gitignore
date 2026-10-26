@@ -5,3 +5,6 @@ data/
 .superpowers/
 *.pyc
 *.log
+.env
+.env.*
+!.env.example
