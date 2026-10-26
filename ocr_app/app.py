@@ -11,9 +11,11 @@ from pydantic import BaseModel, ConfigDict, ValidationError
 
 from .access import AccessPolicy
 from .config import DATA_ROOT, Settings, SUPPORTED
+from .conversion import converter_available
 from .demo import create_demo
 from .jobs import BusyError, JobManager
 from .processing import file_record
+from .public_jobs import PublicJobManager
 from .recognition import load_reference
 from .security import LocalOnlyMiddleware
 from .storage import JobStore, contained, safe_relative, unique_path
@@ -50,7 +52,7 @@ def create_app(data_root: Path | None = None, settings=None):
     if settings.public and data_root is None and not os.environ.get('OCR_DATA_DIR'):
         raise ValueError('El modo público necesita OCR_DATA_DIR para separar sus documentos de la versión local.')
     store = JobStore(data_root or DATA_ROOT, limits=limits)
-    manager = JobManager(store)
+    manager = PublicJobManager(store, settings) if settings.public else JobManager(store)
     access = AccessPolicy(store, settings)
 
     @asynccontextmanager
@@ -93,7 +95,10 @@ def create_app(data_root: Path | None = None, settings=None):
 
     @app.get('/api/health')
     def health():
+        converter = 'libreoffice' if settings.public else 'word'
+        available = converter_available(converter) if settings.public else word_available()
         return dict(name='Proyecto OCR', version='1.1.0', local=not settings.public, word=word_available(),
+                    converter=converter, conversion_available=available,
                     retention_seconds=settings.retention_seconds if settings.public else None,
                     limits=dict(files=limits.files, file_mb=limits.file_bytes // 1024**2,
                                 job_mb=limits.job_bytes // 1024**2, reference_mb=limits.reference_bytes // 1024**2))
