@@ -12,8 +12,6 @@ def main():
         import resource
         resource.setrlimit(resource.RLIMIT_CPU, (180, 180))
         resource.setrlimit(resource.RLIMIT_FSIZE, (96 * 1024**2, 96 * 1024**2))
-    import cv2
-    cv2.setNumThreads(1)
     from .processing import run_pipeline
     store = JobStore(sys.argv[1], limits=Settings(public=True).limits(), recover=False)
     run_pipeline(store, sys.argv[2], threading.Event())

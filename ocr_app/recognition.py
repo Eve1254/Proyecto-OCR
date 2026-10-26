@@ -2,15 +2,14 @@
 import io
 from pathlib import Path
 
-import cv2
-import numpy as np
-import pymupdf
-from PIL import Image, ImageOps
-
 from .config import LIMITS
 
 
 def descriptors(data: bytes, limits=LIMITS):
+    import cv2
+    import numpy as np
+    from PIL import Image, ImageOps
+    cv2.setNumThreads(1)
     with Image.open(io.BytesIO(data)) as image:
         if image.width * image.height > limits.image_pixels:
             raise ValueError('La imagen supera el límite de píxeles para esta versión.')
@@ -31,6 +30,9 @@ def load_reference(path: Path, limits=LIMITS):
 
 
 def inspect_pdf(path: Path, reference, evidence_dir: Path, limits=LIMITS) -> dict:
+    import cv2
+    import pymupdf
+    from PIL import Image
     result = dict(state='review', matches=[], images=0, message='')
     failures = []
     try:

@@ -3,13 +3,12 @@ import io
 import random
 from pathlib import Path
 
-import pymupdf
-from PIL import Image, ImageDraw, ImageFont
-
 from .processing import file_record
 
 
 def create_demo(directory: Path):
+    import pymupdf
+    from PIL import Image, ImageDraw, ImageFont
     image = Image.new('RGB', (480, 300), '#eef5f2')
     draw = ImageDraw.Draw(image)
     rng = random.Random(26)
