@@ -1,6 +1,8 @@
 # Piloto de Internet
 
-Esta versión permite abrir la aplicación desde un navegador sin instalar Python, Word ni otro programa. El procesamiento ocurre en el servidor. La configuración está preparada para **Render Free**; tener el código en GitHub no significa que el servicio ya esté desplegado.
+Esta versión permite abrir la aplicación desde un navegador sin instalar Python, Word ni otro programa. El procesamiento ocurre en el servidor, en **Render Free**.
+
+**Enlace del piloto:** [Proyecto OCR](https://proyecto-ocr-fcml.onrender.com/).
 
 ## Experiencia de la persona visitante
 

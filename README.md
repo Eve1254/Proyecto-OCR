@@ -1,10 +1,10 @@
 # Proyecto OCR
 
-Una aplicación web local para preparar documentos, reconocer logotipos en PDF y revisar una clasificación sugerida. Recupera el flujo del proyecto original de Python mediante una interfaz en español.
+Una aplicación web para preparar documentos, reconocer logotipos en PDF y revisar una clasificación sugerida. Puedes probarla desde Internet o ejecutarla en tu computador. Recupera el flujo del proyecto original de Python mediante una interfaz en español.
 
 ![Interfaz de Proyecto OCR](docs/screenshots/proyecto-ocr.png)
 
-**Python · FastAPI · OpenCV · Microsoft Word · HTML/CSS/JavaScript**
+**Python · FastAPI · OpenCV · Word / LibreOffice · Docker · Render · HTML/CSS/JavaScript**
 
 ## Qué puedes hacer
 
@@ -18,7 +18,11 @@ El nombre conserva el del proyecto original. Esta versión reconoce logotipos; t
 
 ## Probar desde Internet
 
-La aplicación incluye un modo público para desplegar en **Render gratuito**, sin instalación para sus visitantes: sesiones anónimas separadas, archivos temporales durante una hora, cola de procesamiento y conversión de Word en el servidor. El código en GitHub por sí solo no pone el servicio en línea.
+[**Abrir Proyecto OCR en el navegador**](https://proyecto-ocr-fcml.onrender.com/)
+
+El piloto funciona en **Render gratuito**, sin registro ni instalación. Pulsa **Probar con un ejemplo** para usar documentos ficticios. Cada navegador tiene sus trabajos separados y los archivos caducan una hora después de crear el lote; una suspensión o reinicio puede eliminarlos antes. Descarga tus resultados al terminar.
+
+Después de un período de inactividad, la primera apertura puede tardar alrededor de un minuto. Usa documentos sin información confidencial durante esta etapa de pruebas.
 
 Consulta la [guía del piloto de Internet](docs/internet.md) para conocer los límites y desplegarlo. La versión local sigue disponible con los pasos siguientes.
 
@@ -90,6 +94,7 @@ La herramienta nació de un proceso de automatización documental y evolucionó 
 
 - [Historia, aprendizajes y texto para portafolio](docs/experiencia.md).
 - [Validación funcional y pruebas realizadas](docs/validacion.md).
+- [Validación y despliegue del piloto público](docs/validacion-internet.md).
 
 Las siguientes etapas son validar documentos representativos, medir el reconocimiento y recoger comentarios del piloto público. Las cuentas personales y el almacenamiento permanente quedan fuera de esta primera prueba.
 
