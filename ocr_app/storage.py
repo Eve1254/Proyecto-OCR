@@ -7,6 +7,8 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path
 
+from .config import LIMITS
+
 RESERVED = re.compile(r'^(CON|PRN|AUX|NUL|COM[0-9¹²³]|LPT[0-9¹²³])(?:\.|$)', re.I)
 
 
@@ -58,12 +60,13 @@ def unique_path(root: Path, relative: Path) -> Path:
 
 
 class JobStore:
-    def __init__(self, root: Path):
+    def __init__(self, root: Path, limits=None, recover=True):
         self.root = Path(root).resolve()
         self.root.mkdir(parents=True, exist_ok=True)
         self.lock = threading.RLock()
-        for job in self.list():
-            if job['status'] in {'running', 'cancelling', 'uploading', 'preparing'}:
+        self.limits = limits if limits is not None else LIMITS
+        for job in self.list() if recover else []:
+            if job['status'] in {'running', 'queued', 'cancelling', 'uploading', 'preparing'}:
                 job.update(status='interrupted', stage='Interrumpido por cierre de la aplicación')
                 job['logs'].append('El trabajo se interrumpió. Crea uno nuevo para repetir el proceso.')
                 self.save(job)
@@ -73,11 +76,13 @@ class JobStore:
             raise ValueError('Identificador de trabajo no válido.')
         return contained(self.root, self.root / job_id)
 
-    def create(self, options: dict, demo=False, status='ready') -> dict:
+    def create(self, options: dict, demo=False, status='ready', owner=None) -> dict:
         job = dict(id=uuid.uuid4().hex, created=now(), status=status, stage='Preparado',
                    demo=demo, options=options, files=[], groups=[], errors=[], logs=[],
                    progress={'done': 0, 'total': 0}, reference=None, artifacts=[],
                    name='Demostración' if demo else 'Mis documentos')
+        if owner is not None:
+            job['owner'] = owner
         directory = self.directory(job['id'])
         for child in ('input', 'derived', 'evidence', 'output'):
             (directory / child).mkdir(parents=True, exist_ok=True)

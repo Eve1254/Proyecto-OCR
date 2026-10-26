@@ -1,0 +1,10 @@
+**
+!requirements.txt
+!requirements-dev.txt
+!ocr_app/
+!ocr_app/**
+!run_server.py
+!tests/
+!tests/**
+**/__pycache__/
+**/*.pyc

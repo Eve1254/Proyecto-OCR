@@ -1,0 +1,33 @@
+name: Verificar aplicación y contenedor
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  linux-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar JavaScript
+        run: node --check ocr_app/static/app.js
+      - name: Probar en Linux con LibreOffice real
+        run: docker build --target test -t proyecto-ocr-test .
+      - name: Construir imagen pública
+        run: docker build --target production -t proyecto-ocr .
+      - name: Probar servidor HTTP con 512 MB
+        run: |
+          docker run -d --name ocr-pilot --memory=512m --cpus=1 \
+            -e OCR_MODE=public -e OCR_PUBLIC_ORIGIN=https://pilot.example \
+            -e OCR_SESSION_SECRET=ephemeral-ci-session-key-never-used-in-production \
+            -e OCR_DATA_DIR=/app/data/jobs proyecto-ocr
+          docker cp tests/smoke_public.py ocr-pilot:/tmp/smoke_public.py
+          docker exec ocr-pilot python /tmp/smoke_public.py
+          docker stats --no-stream --format '{{.MemUsage}}' ocr-pilot
+      - name: Ver diagnóstico y cerrar contenedor de prueba
+        if: always()
+        run: |
+          docker logs ocr-pilot || true
+          docker rm -f ocr-pilot || true

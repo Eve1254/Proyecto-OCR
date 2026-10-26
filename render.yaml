@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: proyecto-ocr
+    runtime: docker
+    plan: free
+    region: oregon
+    dockerfilePath: ./Dockerfile
+    healthCheckPath: /api/health
+    autoDeployTrigger: off
+    envVars:
+      - key: OCR_MODE
+        value: public
+      - key: OCR_DATA_DIR
+        value: /app/data/jobs
+      - key: OCR_SESSION_SECRET
+        generateValue: true
+      - key: PORT
+        value: '8000'

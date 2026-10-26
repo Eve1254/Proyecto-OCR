@@ -4,11 +4,10 @@ import uuid
 import zipfile
 from pathlib import Path
 
-from .config import LIMITS
+from .conversion import convert_document
 from .recognition import inspect_pdf, load_reference
 from .reports import write_report
 from .storage import JobStore, contained, group_key, now, unique_path
-from .word_worker import convert_docx
 
 
 class Cancelled(Exception):
@@ -34,6 +33,7 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
     job = store.get(job_id)
     directory = store.directory(job_id)
     options = job['options']
+    limits = store.limits
 
     def checkpoint():
         if cancelled.is_set():
@@ -50,10 +50,10 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
         job['errors'].append(dict(file=file['relative'], message=file['message']))
 
     def register(path, parent):
-        if path.stat().st_size > LIMITS.file_bytes or sum(f['size'] for f in job['files']) + path.stat().st_size > LIMITS.job_bytes:
+        if path.stat().st_size > limits.file_bytes or sum(f['size'] for f in job['files']) + path.stat().st_size > limits.job_bytes:
             path.unlink(missing_ok=True)
             raise ValueError('Los archivos generados superan el límite de tamaño del trabajo.')
-        if len(job['files']) >= 2000:
+        if len(job['files']) >= limits.generated_files:
             path.unlink(missing_ok=True)
             raise ValueError('Se alcanzó el límite de archivos generados.')
         relative = path.relative_to(directory / 'derived').as_posix()
@@ -77,7 +77,7 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
                 relative_parent = Path(file['relative']).parent
                 if file['kind'] == 'docx':
                     target = unique_path(directory / 'derived', relative_parent / (Path(file['relative']).stem + '.pdf'))
-                    convert_docx(path, target)
+                    convert_document(path, target, backend='libreoffice' if job.get('owner') else 'word', timeout=limits.word_timeout)
                     register(target, file)
                     file.update(state='processed', message='Convertido a PDF.')
                 else:
@@ -92,7 +92,7 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
                                 if not str(name).lower().endswith('.pdf'):
                                     continue
                                 data = attachment.data
-                                if not isinstance(data, bytes) or len(data) > LIMITS.file_bytes:
+                                if not isinstance(data, bytes) or len(data) > limits.file_bytes:
                                     raise ValueError('Adjunto PDF no compatible o demasiado grande.')
                                 folder = relative_parent / (Path(file['relative']).stem[:50] + '_adjuntos')
                                 target = unique_path(directory / 'derived', folder / attachment_name(name, number))
@@ -112,12 +112,12 @@ def run_pipeline(store: JobStore, job_id: str, cancelled: threading.Event):
             except Exception as error:
                 problem(file, error)
             store.save(job)
-        reference = load_reference(directory / job['reference']) if options.get('recognize') else None
+        reference = load_reference(directory / job['reference'], limits) if options.get('recognize') else None
         pdfs = [file for file in job['files'] if file['kind'] == 'pdf']
         for index, file in enumerate(pdfs):
             stage('Reconociendo logotipo' if reference is not None else 'Organizando archivos', index, len(pdfs))
             if reference is not None:
-                result = inspect_pdf(contained(directory, directory / file['path']), reference, directory / 'evidence' / file['id'])
+                result = inspect_pdf(contained(directory, directory / file['path']), reference, directory / 'evidence' / file['id'], limits)
                 file.update(result)
                 if result['state'] == 'review':
                     job['errors'].append(dict(file=file['relative'], message=result['message']))

@@ -1,7 +1,5 @@
 from pathlib import Path
 
-from openpyxl import Workbook
-from openpyxl.styles import Alignment, Font, PatternFill
 from .storage import group_key
 
 LABELS = {'match': 'Con logotipo', 'no_match': 'Sin coincidencia', 'review': 'Revisar',
@@ -9,6 +7,8 @@ LABELS = {'match': 'Con logotipo', 'no_match': 'Sin coincidencia', 'review': 'Re
 
 
 def write_report(job: dict, directory: Path) -> Path:
+    from openpyxl import Workbook
+    from openpyxl.styles import Alignment, Font, PatternFill
     workbook = Workbook()
     summary = workbook.active
     summary.title = 'Resumen'
