@@ -1,0 +1,19 @@
+name: Verificar aplicación y contenedor
+on:
+  push:
+    branches: [main, 'codex/**']
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  linux-container:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - name: Comprobar JavaScript
+        run: node --check ocr_app/static/app.js
+      - name: Probar en Linux con LibreOffice real
+        run: docker build --target test -t proyecto-ocr-test .
+      - name: Construir imagen pública
+        run: docker build --target production -t proyecto-ocr .

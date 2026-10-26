@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Proyecto OCR · Gestor documental</title>
-  <meta name="description" content="Organiza, reconoce y clasifica documentos en tu computador.">
+  <meta name="description" content="Organiza documentos, reconoce logotipos y revisa resultados desde el navegador.">
   <link rel="icon" href="/icon.svg" type="image/svg+xml">
   <link rel="stylesheet" href="/styles.css"><script src="/app.js" defer></script>
 </head>
@@ -29,15 +29,16 @@
         <button class="nav-button" data-view="about"><svg><use href="#book"/></svg>El proyecto</button>
       </nav>
     </div>
-    <div class="sidebar-bottom"><span class="local-icon"><svg><use href="#monitor"/></svg></span><div>En tu computador<small>Archivos procesados localmente</small></div></div>
+    <div class="sidebar-bottom"><span class="local-icon"><svg><use href="#monitor"/></svg></span><div><span id="storage-title">En tu computador</span><small id="storage-description">Archivos procesados localmente</small></div></div>
   </aside>
   <main id="main">
-    <header class="topbar"><span class="environment"><span class="dot"></span>Versión local <span class="version">1.0</span></span><span id="connection-status">Conectando…</span></header>
+    <header class="topbar"><span class="environment"><span class="dot"></span><span id="environment-label">Proyecto OCR</span> <span class="version">1.1</span></span><span id="connection-status">Conectando…</span></header>
     <div id="notice" role="alert" hidden><span id="notice-text"></span><button id="dismiss-notice" aria-label="Cerrar aviso">×</button></div>
     <div id="live-status" class="visually-hidden" role="status"></div>
     <section id="view-process" class="view" aria-labelledby="process-title">
       <div class="page-heading"><div><p class="eyebrow">Organización y reconocimiento</p><h1 id="process-title">Tus documentos, <br>en orden.</h1><p class="subtitle">Prepara tus archivos, reconoce un logotipo y organiza los resultados desde un mismo lugar.</p></div><button class="button secondary demo-button" id="demo-button">Probar con un ejemplo <svg><use href="#arrow"/></svg></button></div>
       <ol class="steps" aria-label="Pasos del proceso"><li class="current"><span>1</span>Documentos</li><li><span>2</span>Procesos</li><li><span>3</span>Resultados</li></ol>
+      <section id="public-notice" class="note-box" hidden aria-label="Sobre tus archivos"><strong>Un espacio temporal, solo para tu navegador.</strong><p>Al preparar un lote, enviarás copias al servidor para procesarlas. Cada trabajo caduca una hora después de crearlo y sus archivos se eliminan automáticamente. Descarga tus resultados antes; un reinicio del piloto puede eliminarlos antes de esa hora.</p><p>Para conocer la herramienta, usa el ejemplo o documentos de prueba sin información confidencial. Si cambias de navegador o borras sus cookies, perderás el acceso a este historial.</p></section>
       <div class="work-grid">
         <section class="panel input-panel" aria-labelledby="input-title">
           <div class="panel-heading"><h2 id="input-title">Documentos de entrada</h2><span id="file-count" class="muted small">Sin archivos</span></div>
@@ -77,7 +78,7 @@
       <div class="about-hero"><p class="eyebrow">Una experiencia en automatización</p><h1 id="about-title">De scripts a<br>una herramienta.</h1><p class="subtitle">Un proyecto que reúne organización documental y visión por computador para hacer más fácil un proceso de revisión.</p></div>
       <div class="about-grid"><section class="panel"><span class="chapter">01 / EL PUNTO DE PARTIDA</span><h2>Un proceso que pedía orden</h2><p>Archivos Word, convenios en PDF y documentos guardados como adjuntos de Outlook. El proyecto original nació para preparar esos archivos, buscar un logotipo y organizar carpetas.</p><p>Sus seis scripts de Python son la base de esta aplicación. La nueva versión conecta esas tareas en una experiencia que permite seleccionar archivos, seguir el avance y revisar resultados.</p></section><section class="panel"><span class="chapter">02 / EL RECORRIDO</span><h2>Preparar. Reconocer. Revisar.</h2><ol class="about-flow"><li><strong>Organizar</strong><span>Inventario, conversión y extracción de adjuntos.</span></li><li><strong>Reconocer</strong><span>Comparación de características visuales con SIFT.</span></li><li><strong>Revisar resultados</strong><span>Clasificación sugerida, evidencias y reporte Excel.</span></li></ol></section></div>
       <section class="scope-panel"><div><p class="eyebrow">Un alcance claro</p><h2>Una ayuda para la revisión documental</h2></div><p>Esta versión reconoce logotipos en imágenes incrustadas en PDF. La clasificación es una sugerencia: no valida firmas ni la validez de un convenio y no extrae texto. Los casos incompletos se señalan para revisión manual.</p></section>
-      <div class="about-bottom"><p><strong>Construido con Python</strong><span>FastAPI · OpenCV · PyMuPDF · openpyxl</span></p><p><strong>El siguiente paso</strong><span>Medir resultados con documentos representativos y preparar acceso para otras personas.</span></p></div>
+      <div class="about-bottom"><p><strong>Construido con Python</strong><span>FastAPI · OpenCV · PyMuPDF · openpyxl</span></p><p><strong>El siguiente paso</strong><span>Medir resultados con documentos representativos y mejorar la experiencia a partir de las pruebas.</span></p></div>
     </section>
     <footer class="app-footer"><span>Proyecto OCR</span><span>Organiza · Reconoce · Revisa</span></footer>
   </main>

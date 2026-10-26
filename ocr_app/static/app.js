@@ -1,7 +1,7 @@
 'use strict';
 const $ = id => document.getElementById(id);
-const state = {files: [], reference: null, referenceURL: null, jobs: [], current: null, busy: false, poll: null, view: 'process', deleteId: null};
-const statuses = {preparing: 'Preparando', uploading: 'Cargando archivos', ready: 'Listo para iniciar', running: 'En proceso', completed: 'Completado', completed_with_errors: 'Completado con incidencias', cancelled: 'Cancelado', failed: 'No completado', interrupted: 'Interrumpido'};
+const state = {files: [], reference: null, referenceURL: null, jobs: [], current: null, busy: false, poll: null, view: 'process', deleteId: null, local: true};
+const statuses = {preparing: 'Preparando', uploading: 'Cargando archivos', ready: 'Listo para iniciar', queued: 'En espera', running: 'En proceso', completed: 'Completado', completed_with_errors: 'Completado con incidencias', cancelled: 'Cancelado', failed: 'No completado', interrupted: 'Interrumpido'};
 const outcomes = {match: 'Con logotipo', no_match: 'Sin coincidencia', review: 'Revisar', processed: 'Preparado', pending: 'Pendiente', unclassified: 'Sin clasificar', skipped: 'Omitido'};
 let limits = {files: 500, file_mb: 50, job_mb: 500, reference_mb: 10};
 
@@ -16,7 +16,7 @@ function clearNotice() { $('notice').hidden=true; }
 async function api(path, options={}) {
   let response;
   try { response=await fetch('/api' + path, options); }
-  catch { throw new Error('No se pudo conectar. Comprueba que la ventana de Proyecto OCR siga abierta.'); }
+  catch { throw new Error(state.local?'No se pudo conectar. Comprueba que la ventana de Proyecto OCR siga abierta.':'No se pudo conectar con el piloto. Espera un momento y vuelve a intentarlo.'); }
   if (!response.ok) {
     let message='No se pudo completar la operación (' + response.status + ').';
     try { const error=await response.json(); if(typeof error.detail==='string') message=error.detail; } catch {}
@@ -93,6 +93,7 @@ async function demo() {
 }
 async function refreshHistory() {
   state.jobs=await api('/jobs'); $('history-count').textContent=state.jobs.length;
+  if(state.current&&!state.jobs.some(job=>job.id===state.current.id)){clearTimeout(state.poll);state.current=null;}
   $('results-empty').hidden=state.jobs.length>0; $('results-content').hidden=!state.jobs.length;
   renderHistory();
   if(!state.current&&state.jobs.length) await openJob(state.jobs[0].id);
@@ -115,14 +116,14 @@ async function openJob(id, existing=null) {
 }
 function schedulePoll(job) {
   clearTimeout(state.poll);
-  if(!['running','preparing','uploading'].includes(job.status)) return;
+  if(!['running','queued','preparing','uploading'].includes(job.status)) return;
   state.poll=setTimeout(async()=>{
     if(state.current?.id!==job.id) return;
     try {
       const updated=await api('/jobs/'+job.id);
       if(state.current?.id!==job.id) return;
       state.current=updated; renderJob(updated); schedulePoll(updated);
-      if(updated.status!=='running') await refreshHistory();
+      if(!['running','queued'].includes(updated.status)) await refreshHistory();
     } catch(error) { notify(error.message); }
   },1000);
 }
@@ -143,7 +144,7 @@ function renderJob(job) {
   const detail=$('job-detail'); detail.replaceChildren();
   const heading=node('div','job-heading'), title=node('div');
   title.append(node('h2','',job.demo?'Demostración con documentos ficticios':job.name),badge(job.status),node('p','small muted',dateLabel(job.created)));
-  const remove=button('Borrar trabajo',()=>{state.deleteId=job.id;$('delete-dialog').showModal();$('cancel-delete').focus();},'text-button'); remove.disabled=['running','preparing','uploading'].includes(job.status);
+  const remove=button('Borrar trabajo',()=>{state.deleteId=job.id;$('delete-dialog').showModal();$('cancel-delete').focus();},'text-button'); remove.disabled=['running','queued','preparing','uploading'].includes(job.status);
   heading.append(title,remove); detail.append(heading);
   const status=node('section','status-panel'); status.append(node('h3','',job.stage));
   if(job.status==='ready') {
@@ -152,12 +153,15 @@ function renderJob(job) {
     const names={convert:'Word a PDF',extract:'Adjuntos PDF de Outlook',recognize:'Reconocimiento',classify:'Clasificación',report:'Excel',evidence:'Evidencias en ZIP'};
     status.append(node('p','small muted',Object.entries(names).filter(([key])=>job.options[key]).map(([,name])=>name).join(' · ')));
     const actions=node('div','status-actions'); const start=button('Iniciar procesamiento',()=>startJob(job.id),'button primary'); start.id='start-job'; start.append(icon('arrow')); actions.append(start); status.append(actions);
+  } else if(job.status==='queued') {
+    status.append(node('p','','El piloto procesa un lote cada vez. El tuyo comenzará automáticamente cuando llegue su turno.'));
+    const cancel=button('Salir de la cola',()=>cancelJob(job.id));cancel.id='cancel-job';status.append(cancel);
   } else if(job.status==='running') {
     const progress=node('progress');
     progress.setAttribute('aria-label',job.stage);
     if(job.progress.total) { progress.max=job.progress.total; progress.value=job.progress.done; }
     status.append(progress,node('p','',job.progress.total?job.progress.done+' de '+job.progress.total+' archivos en esta etapa.':'Preparando la siguiente etapa…'));
-    const actions=node('div','status-actions'); const cancel=button(job.cancellation_requested?'Cancelación solicitada':'Cancelar después del archivo actual',()=>cancelJob(job.id)); cancel.id='cancel-job'; cancel.disabled=job.cancellation_requested; actions.append(cancel); status.append(actions);
+    const actions=node('div','status-actions'); const cancel=button(job.cancellation_requested?'Cancelación solicitada':(state.local?'Cancelar después del archivo actual':'Cancelar procesamiento'),()=>cancelJob(job.id)); cancel.id='cancel-job'; cancel.disabled=job.cancellation_requested; actions.append(cancel); status.append(actions);
   } else if(['preparing','uploading'].includes(job.status)) {
     status.append(node('p','','Preparando las copias. Espera a que finalice antes de iniciar.'));
   } else {
@@ -165,6 +169,7 @@ function renderJob(job) {
     if(job.artifacts.length) { const actions=node('div','status-actions'); if(job.artifacts.includes('excel'))actions.append(downloadLink(job,'excel','Reporte Excel')); if(job.artifacts.includes('zip'))actions.append(downloadLink(job,'zip','Resultados ZIP')); status.append(actions); }
   }
   detail.append(status);
+  if(job.expires_at)detail.append(node('p','note-box','Este trabajo caduca el '+dateLabel(job.expires_at)+'. Descarga tus resultados antes de esa hora.'));
   if(job.demo) detail.append(node('p','note-box','Demostración: todos los documentos son ficticios. Los resultados se calculan con el mismo motor que procesa tus archivos.'));
   if(job.groups.length) {
     const summary=node('div','job-summary');
@@ -227,7 +232,20 @@ $('close-evidence').addEventListener('click',()=>$('evidence-dialog').close());
 $('cancel-delete').addEventListener('click',()=>$('delete-dialog').close());
 $('confirm-delete').addEventListener('click',deleteJob);
 async function boot() {
-  try { const health=await api('/health');limits=health.limits;$('connection-status').textContent='Listo para trabajar';$('word-status').textContent=health.word?'Microsoft Word disponible en este equipo':'Requiere Microsoft Word en Windows';if(!health.word){$('opt-convert').checked=false;$('opt-convert').disabled=true;}$('limit-note').textContent='Hasta '+limits.files+' archivos · '+limits.file_mb+' MB por archivo · '+limits.job_mb+' MB por lote';await refreshHistory(); }
+  try {
+    const health=await api('/health');limits=health.limits;state.local=health.local;
+    await api('/session');
+    $('connection-status').textContent='Listo para trabajar';
+    $('environment-label').textContent=state.local?'Versión local':'Piloto en Internet';
+    $('public-notice').hidden=state.local;
+    if(!state.local){$('storage-title').textContent='Tu sesión de prueba';$('storage-description').textContent='Archivos temporales · 1 hora';}
+    const available=health.conversion_available??health.word;
+    $('word-status').textContent=state.local?(available?'Microsoft Word disponible en este equipo':'Requiere Microsoft Word en Windows'):(available?'Conversión en el servidor; el formato puede variar respecto a Word':'Conversión no disponible; carga el documento en PDF');
+    if(!available){$('opt-convert').checked=false;$('opt-convert').disabled=true;}
+    $('reference-name').textContent='PNG o JPG · hasta '+limits.reference_mb+' MB';
+    $('limit-note').textContent='Hasta '+limits.files+' archivos · '+limits.file_mb+' MB por archivo · '+limits.job_mb+' MB por lote';
+    await refreshHistory();
+  }
   catch(error){$('connection-status').textContent='Sin conexión';notify(error.message);}
 }
 boot();
